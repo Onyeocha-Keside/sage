@@ -1,0 +1,42 @@
+# Redeploys the Sage API Worker (sage-api) whenever server code or its
+# config changes on main. Secrets (API keys) already live on Cloudflare and
+# are not touched by deploys.
+name: Deploy worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/src/**"
+      - "worker/wrangler.toml"
+      - "worker/package.json"
+      - "worker/package-lock.json"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - run: npm ci
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 3155a670d2151fc3a55df8ee3382a236

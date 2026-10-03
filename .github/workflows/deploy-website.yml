@@ -1,0 +1,39 @@
+# Publishes the landing page to sage.kesideonyeocha.com (Cloudflare Pages
+# project "sage-landing") whenever website files change on main.
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/sage/**"
+      - ".github/workflows/deploy-website.yml"
+  workflow_dispatch: # also runnable by hand from the Actions tab
+
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      # Wrangler is pinned in the Worker's package-lock, so CI uses the same version as your Mac.
+      - name: Install wrangler
+        working-directory: worker
+        run: npm ci
+
+      - name: Publish to Cloudflare Pages
+        working-directory: website
+        run: ../worker/node_modules/.bin/wrangler pages deploy sage --project-name sage-landing --branch main --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 3155a670d2151fc3a55df8ee3382a236

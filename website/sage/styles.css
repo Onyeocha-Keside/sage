@@ -625,3 +625,15 @@ section[id] { scroll-margin-top: 84px; }
   .hero h1 { margin-top: 18px; }
   .demo-section { padding-bottom: 24px; }
 }
+
+.hero-promise { margin: 16px auto 0; font-weight: 600; font-size: 20px; color: var(--forest); }
+.hero-privacy { max-width: 580px; margin: 16px auto 0; font-size: 14px; color: var(--ink-muted); line-height: 1.65; }
+.hero-privacy a { color: var(--forest); }
+.platform-caption { margin-bottom: 10px; color: var(--ink-muted); font-size: 13px; }
+.demo-choice-label { text-align: center; font-size: 13px; color: var(--ink-muted); margin-top: 16px; }
+.sage-bubble { transform: translate(var(--x, 0px), var(--y, 0px)) scale(var(--bubble-scale, .6)); }
+@media (max-width: 600px) {
+  .site-header { position: relative; }
+  .hero-promise { font-size: 18px; }
+  .hero-privacy { font-size: 13px; padding: 0 6px; }
+}

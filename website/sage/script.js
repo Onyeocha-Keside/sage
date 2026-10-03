@@ -217,8 +217,17 @@ function setPosition(element, position) {
 }
 
 function moveSageTo(position) {
-  setPosition(sageCursor, position);
-  setPosition(sageBubble, { x: Math.min(position.x, macScreen.offsetWidth - 135), y: position.y });
+  const boundedPosition = {
+    x: Math.max(12, Math.min(position.x, macScreen.offsetWidth - 12)),
+    y: Math.max(12, Math.min(position.y, macScreen.offsetHeight - 12)),
+  };
+  setPosition(sageCursor, boundedPosition);
+  // Put labels above their targets, away from the next worksheet row.
+  const bubbleWidth = sageBubble.offsetWidth || 120;
+  setPosition(sageBubble, {
+    x: Math.max(8, Math.min(boundedPosition.x - bubbleWidth / 2, macScreen.offsetWidth - bubbleWidth - 8)),
+    y: Math.max(8, boundedPosition.y - 44),
+  });
 }
 
 function moveUserPointerTo(position) {
@@ -243,9 +252,10 @@ async function pointSageAt(element, label) {
   isSageFollowingPointer = false;
   hideSageBubble();
   const target = centerOf(element);
-  moveSageTo({ x: target.x + 10, y: target.y + 12 });
+  moveSageTo({ x: target.x + 6, y: target.y + 8 });
   await sleep(850);
   sageBubble.textContent = label;
+  moveSageTo({ x: target.x + 6, y: target.y + 8 });
   sageBubble.classList.add("is-visible");
 }
 

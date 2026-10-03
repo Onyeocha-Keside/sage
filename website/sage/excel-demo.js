@@ -4,8 +4,8 @@ const excelWindow = document.getElementById("excel-window");
 const canvaWindow = document.querySelector(".canva-window");
 const excelFilterPanel = document.getElementById("excel-filter-panel");
 const excelStatusArrow = document.querySelector('[data-target="excel-status"]');
-const excelSelectAll = document.querySelector('[data-target="excel-select-all"]');
-const excelOverdue = document.querySelector('[data-target="excel-overdue"]');
+const excelSelectAll = document.querySelector('[data-target="excel-select-all"] .excel-checkbox');
+const excelOverdue = document.querySelector('[data-target="excel-overdue"] .excel-checkbox');
 const excelApply = document.querySelector('[data-target="excel-apply"]');
 const demoScenarioButtons = [...document.querySelectorAll("[data-demo]")];
 const safariMenuMarkup = document.querySelector(".menubar-left").innerHTML;
@@ -84,11 +84,11 @@ async function playExcelDemo() {
   await guideExcelClick(excelStatusArrow, "“open the filter on the Status column.”", "status filter");
   excelFilterPanel.hidden = false;
   await sleep(600);
-  await guideExcelClick(excelSelectAll, "“clear Select All, so we can choose one status.”", "select all");
+  await guideExcelClick(excelSelectAll, "“clear Select All, so we can choose one status.”", "clear Select All");
   excelFilterPanel.querySelectorAll(".excel-checkbox").forEach((checkbox) => checkbox.classList.remove("is-checked"));
   await sleep(500);
   await guideExcelClick(excelOverdue, "“now select Overdue.”", "overdue");
-  excelOverdue.querySelector(".excel-checkbox").classList.add("is-checked");
+  excelOverdue.classList.add("is-checked");
   await sleep(500);
   await guideExcelClick(excelApply, "“click Apply Filter to show only those invoices.”", "apply filter");
   applyOverdueFilter();
@@ -107,7 +107,7 @@ function showStillExcelFrame() {
   const target = centerOf(excelStatusArrow);
   isSageFollowingPointer = false;
   setSageMode("pointing");
-  moveSageTo({ x: target.x + 10, y: target.y + 12 });
+  moveSageTo({ x: target.x + 6, y: target.y + 8 });
 }
 
 demoScenarioButtons.forEach((button) => button.addEventListener("click", () => {

@@ -29,7 +29,7 @@
         Sage
       </a>
       <nav class="site-nav" aria-label="Main">
-        <a class="nav-cta" href="#waitlist">Join the waitlist</a>
+        <a class="nav-cta" href="#waitlist">Get early access</a>
       </nav>
     </div>
   </header>
@@ -38,22 +38,26 @@
     <!-- ============ HERO ============ -->
     <section class="hero" id="top">
       <div class="page-width hero-copy">
-        <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Early access for Mac · Windows later</p>
+        <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Coming soon for Mac</p>
         <h1>Know what to<br><em>click next.</em></h1>
         <p class="hero-subtitle">
-          Hold <kbd>control</kbd> + <kbd>option</kbd> and ask out loud. Sage sees your screen,
-          explains what to do, and points you through it—one step at a time.
+          Stuck in an unfamiliar app? Ask out loud. Sage explains the next step
+          and points to it on your screen, without uploading screenshots yourself.
         </p>
 
+        <p class="hero-promise">Sage points; you make every click.</p>
+        <p class="hero-privacy">Screenshots are captured when you ask, then after your actions during follow-along. They go through our server to Claude; Sage doesn’t save them to disk. <a href="privacy.html">Privacy details</a></p>
+
         <form class="waitlist-form" id="waitlist" novalidate>
+          <p class="platform-caption">Notify me about</p>
           <div class="platform-choice" role="radiogroup" aria-label="Which computer do you use?">
             <label class="platform-option">
               <input type="radio" name="platform" value="mac" checked>
-              <span><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>I use a Mac</span>
+              <span><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Mac beta</span>
             </label>
             <label class="platform-option">
               <input type="radio" name="platform" value="windows">
-              <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows (later)</span>
+              <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows interest</span>
             </label>
           </div>
           <div class="waitlist-row">
@@ -64,7 +68,7 @@
             <button class="button button-primary" type="submit">Get early access</button>
           </div>
           <p class="form-note" id="form-note" role="status">Free during the beta. One email when it's ready, no spam.</p>
-          <p class="signup-privacy">Your email is used for early-access updates. <a href="privacy.html">How we handle your data</a></p>
+          
         </form>
       </div>
 
@@ -285,7 +289,8 @@
             <span class="caption-speaker">You</span> “how do I export this as a PNG?”
           </figcaption>
         </figure>
-        <div class="demo-scenarios" role="group" aria-label="Choose a walkthrough"><button type="button" data-demo="canva" aria-pressed="true">Canva <span>Export a poster</span></button><button type="button" data-demo="excel" aria-pressed="false">Excel <span>Find overdue invoices</span></button></div>
+        <p class="demo-choice-label">Choose a demo</p>
+      <div class="demo-scenarios" role="group" aria-label="Choose a walkthrough"><button type="button" data-demo="canva" aria-pressed="true">Canva <span>Export a poster</span></button><button type="button" data-demo="excel" aria-pressed="false">Excel <span>Find overdue invoices</span></button></div>
         <div class="demo-controls" aria-label="Demo playback">
           <button type="button" id="demo-pause" aria-pressed="false">Pause demo</button>
           <button type="button" id="demo-replay">Replay</button>
@@ -299,7 +304,7 @@
 
   <footer class="site-footer">
     <div class="page-width site-footer-inner">
-      <span>© 2026 Keside Onyeocha</span>
+      <span>Built by <a href="https://kesideonyeocha.com">Keside Onyeocha</a> · © 2026</span>
       <a href="privacy.html">Privacy &amp; your data</a>
     </div>
   </footer>
