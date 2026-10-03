@@ -1,0 +1,83 @@
+/* A compact desktop demonstration for phones, rather than a zoomed crop. */
+@media (max-width: 600px) {
+  .hero { padding-bottom: 150px; }
+  .demo-section { margin-top: -95px; }
+  .demo-intro { margin-top: 0; padding: 20px; }
+  .demo-intro h2 { font-size: 36px; }
+  .demo-intro p:not(.section-eyebrow) { font-size: 15px; }
+  .mac-stage { aspect-ratio: 3 / 4; border-radius: 15px; box-shadow: 0 0 0 4px #1d1f1e, 0 18px 38px #1f3b2d28; }
+  .mac-screen { width: 420px; height: 560px; }
+  .menubar, .safari-titlebar, .canva-design-panel, .canva-rail { display: none; }
+  .app-window { left: 0; top: 0; width: 420px; height: 510px; border-radius: 0; box-shadow: none; }
+  .canva-topbar { height: 54px; gap: 16px; padding: 0 15px; }
+  .canva-topbar > span:not(.canva-document-title):not(.canva-hamburger) { display: none; }
+  .canva-document-title { margin: 0 auto 0 0; font-size: 13px; }
+  .canva-share { font-size: 14px; padding: 9px 12px; }
+  .canva-workspace { display: block; height: 423px; }
+  .canva-canvas { height: 100%; padding-top: 58px; }
+  .canva-poster-selection { width: 240px; height: 300px; }
+  .canva-page-label, .canva-add-page { width: 240px; }
+  .canva-poster-selection .poster { padding: 24px 22px; }
+  .poster-title { font-size: 52px; }
+  .poster-sun { width: 54px; height: 54px; right: 22px; }
+  .poster-meta { font-size: 11px; }
+  .canva-bottom-bar { height: 33px; gap: 12px; }
+  .canva-bottom-bar > span:nth-child(2), .canva-bottom-bar > span:nth-last-child(-n+2) { display: none; }
+  .canva-share-panel, .canva-download-panel { right: 18px; top: 65px; width: 384px; padding: 20px; }
+  .canva-panel-label { font-size: 13px; }
+  .canva-search, .canva-access { font-size: 13px; }
+  .canva-share-panel h3, .canva-download-panel h3 { font-size: 17px; }
+  .canva-share-options > div { font-size: 11px; }
+  .canva-download-panel .export-format, .canva-download-panel .format-menu { font-size: 14px; }
+  .download-checkbox, .download-settings, .download-dimensions { font-size: 12px; }
+  .canva-download-panel .export-button { font-size: 14px; padding: 13px; }
+  .dock { bottom: 6px; gap: 2px; padding: 3px 5px 5px; border-radius: 12px; }
+  .dock-icon { width: 24px; height: 24px; }
+  .dock-divider { height: 22px; margin: 0 2px; }
+  .dock-icon::before { font-size: 10px; bottom: calc(100% + 5px); }
+  .mac-notification { top: 12px; right: 12px; width: 330px; }
+  .sage-bubble { font-size: 13px; }
+  .demo-caption { margin-top: 22px; min-height: 96px; font-size: 17px; padding: 0 5px; }
+  .demo-scenarios { gap: 8px; }
+  .demo-scenarios button { flex: 1; min-width: 0; font-size: 14px; padding: 12px; }
+  .demo-controls { gap: 8px; margin-top: 14px; }
+  .demo-controls button { min-height: 44px; padding: 10px 13px; }
+  .demo-note { max-width: 320px; margin-inline: auto; }
+  .excel-titlebar { height: 38px; }
+  .excel-autosave, .excel-quick-actions, .excel-search { display: none; }
+  .excel-titlebar .window-title { font-size: 13px; left: 60%; }
+  .excel-ribbon-tabs { height: 37px; gap: 18px; font-size: 12px; }
+  .excel-ribbon-tabs > span:nth-child(n+4), .excel-comments, .excel-share { display: none; }
+  .excel-ribbon { height: 65px; padding-top: 5px; }
+  .excel-ribbon-group:nth-child(n+4) { display: none; }
+  .excel-ribbon-group { font-size: 10px; }
+  .excel-ribbon-group:nth-child(3) { flex: 1; }
+  .excel-ribbon-group:nth-child(3) > div { font-size: 9px; }
+  .excel-formula-bar { height: 30px; }
+  .excel-grid { --excel-columns: 28px 90px 176px 126px; height: 287px; grid-auto-rows: 28px; font-size: 12px; }
+  .excel-column-letter:nth-of-type(n+6), .excel-mobile-hidden, .excel-grid > .excel-empty { display: none; }
+  .excel-sheet-title, .excel-sheet-subtitle { grid-column: span 3; }
+  .excel-data-row > :nth-child(4), .excel-data-row > :nth-child(5), .excel-data-row > :nth-child(6), .excel-data-row > .excel-empty { display: none; }
+  .excel-blank-row > .excel-empty:nth-child(n+5) { display: none; }
+  .excel-status-cell { font-size: 12px; }
+  .excel-filter-panel { left: 58px; top: 78px; width: 344px; font-size: 13px; }
+  .excel-filter-body { padding: 10px 15px; }
+  .excel-filter-body > b, .excel-filter-field, .excel-sort-actions span, .excel-auto-apply { font-size: 12px; }
+  .excel-filter-values > div { height: 30px; }
+  .excel-checkbox { width: 16px; height: 16px; }
+  .excel-filter-actions button, .excel-filter-actions span { font-size: 12px; padding: 5px 8px; }
+  .excel-sheet-tabs { height: 29px; }
+  .excel-statusbar { height: 24px; font-size: 10px; }
+  .excel-statusbar > span:not(:first-child) { display: none; }
+}
+@media (max-width: 600px) {
+  .excel-column-letter { display: none; }
+  .excel-column-letter:nth-of-type(2), .excel-column-letter:nth-of-type(3), .excel-column-letter:nth-of-type(7) { display: flex; }
+  .excel-filter-panel { top: 72px; }
+  .excel-filter-body { padding: 8px 12px; }
+  .excel-filter-body .excel-filter-field:nth-of-type(4) { display: none; }
+  .excel-filter-field { margin: 5px 0; }
+  .excel-filter-body hr { margin: 6px 0; }
+  .excel-filter-values > div { height: 25px; }
+  .excel-auto-apply { margin: 6px 0; }
+}

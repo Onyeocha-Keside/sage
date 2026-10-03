@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sage, the guide that points at your screen</title>
+  <meta name="description" content="Hold Control + Option and ask out loud. Sage looks at your Mac's screen, talks you through it, and points at exactly what to click, one step at a time.">
+  <meta property="og:title" content="Sage, the guide that points at your screen">
+  <meta property="og:description" content="Ask out loud. Sage sees your screen, explains it, and points at exactly what to click. For Mac.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#F6F1E7">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231F3B2D'/%3E%3Cpath d='M18 6c-6.5 0-10.5 3.6-10.5 8.6 0 1 .2 1.9.6 2.6C9 14 11.2 11.8 14.8 10.4c-2.9 2.1-4.8 4.4-5.5 7.3.7.2 1.5.3 2.2.3C16 18 18 12.6 18 6z' fill='%23CFE3D2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="excel-demo.css">
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="page-width site-header-inner">
+      <a class="brand" href="#top" aria-label="Sage home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M18 6c-6.5 0-10.5 3.6-10.5 8.6 0 1 .2 1.9.6 2.6C9 14 11.2 11.8 14.8 10.4c-2.9 2.1-4.8 4.4-5.5 7.3.7.2 1.5.3 2.2.3C16 18 18 12.6 18 6z"/></svg>
+        </span>
+        Sage
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <a class="nav-cta" href="#waitlist">Join the waitlist</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ============ HERO ============ -->
+    <section class="hero" id="top">
+      <div class="page-width hero-copy">
+        <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Early access for Mac · Windows later</p>
+        <h1>Know what to<br><em>click next.</em></h1>
+        <p class="hero-subtitle">
+          Hold <kbd>control</kbd> + <kbd>option</kbd> and ask out loud. Sage sees your screen,
+          explains what to do, and points you through it—one step at a time.
+        </p>
+
+        <form class="waitlist-form" id="waitlist" novalidate>
+          <div class="platform-choice" role="radiogroup" aria-label="Which computer do you use?">
+            <label class="platform-option">
+              <input type="radio" name="platform" value="mac" checked>
+              <span><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>I use a Mac</span>
+            </label>
+            <label class="platform-option">
+              <input type="radio" name="platform" value="windows">
+              <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows (later)</span>
+            </label>
+          </div>
+          <div class="waitlist-row">
+            <label class="visually-hidden" for="waitlist-email">Email address</label>
+            <input id="waitlist-email" type="email" name="email" placeholder="you@email.com" autocomplete="email" required>
+            <!-- Hidden from people; bots that fill every field get filtered out. -->
+            <input class="honeypot" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <button class="button button-primary" type="submit">Get early access</button>
+          </div>
+          <p class="form-note" id="form-note" role="status">Free during the beta. One email when it's ready, no spam.</p>
+          <p class="signup-privacy">Your email is used for early-access updates. <a href="privacy.html">How we handle your data</a></p>
+        </form>
+      </div>
+
+      <!-- Illustrated landscape, drawn in SVG so it's crisp and loads instantly. -->
+      <div class="landscape" aria-hidden="true">
+        <svg viewBox="0 0 1440 460" preserveAspectRatio="xMidYMax slice">
+          <defs>
+            <linearGradient id="hill-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D5E2D0"/><stop offset="1" stop-color="#C3D5BF"/></linearGradient>
+            <linearGradient id="hill-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A8C3A6"/><stop offset="1" stop-color="#93B392"/></linearGradient>
+            <linearGradient id="hill-near" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6F9476"/><stop offset="1" stop-color="#5B8263"/></linearGradient>
+            <g id="pine">
+              <path d="M0 -60 L13 -34 H7 L18 -12 H9 L22 10 H-22 L-9 -12 H-18 L-7 -34 H-13 Z"/>
+              <rect x="-2.5" y="10" width="5" height="9"/>
+            </g>
+          </defs>
+          <g class="sun">
+            <circle cx="1150" cy="150" r="64" fill="#EFC777"/>
+            <g stroke="#EFC777" stroke-width="5" stroke-linecap="round" opacity=".75">
+              <path d="M1150 52v-28M1150 248v28M1052 150h-28M1248 150h28M1081 81l-20-20M1219 219l20 20M1219 81l20-20M1081 219l-20 20"/>
+            </g>
+          </g>
+          <path fill="url(#hill-far)" d="M0 250 C 180 180 330 210 470 240 S 760 190 930 200 S 1250 250 1440 190 V460 H0Z"/>
+          <path fill="url(#hill-mid)" d="M0 310 C 160 260 320 280 520 310 S 860 250 1060 280 S 1330 320 1440 280 V460 H0Z"/>
+          <g fill="#55795D">
+            <use href="#pine" transform="translate(120 300) scale(1.1)"/>
+            <use href="#pine" transform="translate(165 312) scale(.8)"/>
+            <use href="#pine" transform="translate(1290 292) scale(1.15)"/>
+            <use href="#pine" transform="translate(1340 300) scale(.85)"/>
+            <use href="#pine" transform="translate(1235 305) scale(.7)"/>
+          </g>
+          <path fill="url(#hill-near)" d="M0 370 C 220 330 420 350 640 375 S 1050 340 1250 360 S 1400 380 1440 370 V460 H0Z"/>
+          <g fill="#3C5A49">
+            <use href="#pine" transform="translate(40 372) scale(1.5)"/>
+            <use href="#pine" transform="translate(92 382) scale(1.1)"/>
+            <use href="#pine" transform="translate(1385 368) scale(1.55)"/>
+            <use href="#pine" transform="translate(1335 380) scale(1.05)"/>
+          </g>
+          <path fill="#F6F1E7" d="M0 432 C 260 404 520 414 720 420 S 1180 402 1440 428 V460 H0Z"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ============ THE MAC DEMO ============ -->
+    <section class="demo-section" aria-labelledby="demo-heading">
+      <h2 class="visually-hidden" id="demo-heading">See Sage in action</h2>
+      <div class="page-width">
+        <figure class="mac-frame">
+          <div class="mac-stage" id="mac-stage">
+            <!-- Designed at a fixed 1280×800, like a real screenshot, then scaled to fit. -->
+            <div class="mac-screen" id="mac-screen" aria-hidden="true">
+              <div class="wallpaper">
+                <svg viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <linearGradient id="wall-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9CC0D8"/><stop offset=".55" stop-color="#E9D9C2"/><stop offset="1" stop-color="#F2C9A0"/></linearGradient>
+                  </defs>
+                  <rect width="1280" height="800" fill="url(#wall-sky)"/>
+                  <path fill="#B7C9A7" d="M0 520 C 220 440 420 470 640 500 S 1060 430 1280 470 V800 H0Z"/>
+                  <path fill="#8EAD86" d="M0 600 C 260 540 520 570 760 600 S 1120 560 1280 580 V800 H0Z"/>
+                  <path fill="#6B8F6B" d="M0 690 C 300 650 600 670 860 690 S 1180 660 1280 680 V800 H0Z"/>
+                </svg>
+              </div>
+
+              <!-- macOS menu bar -->
+              <div class="menubar">
+                <div class="menubar-left">
+                  <span class="menubar-apple" id="menubar-apple">&#xF8FF;</span>
+                  <strong>Safari</strong>
+                  <span>File</span><span>Edit</span><span>View</span><span>History</span><span>Bookmarks</span><span>Window</span><span>Help</span>
+                </div>
+                <div class="menubar-right">
+                  <span class="menubar-sage" data-target="sage-menu-icon">
+                    <svg viewBox="0 0 24 24"><path d="M18 6c-6.5 0-10.5 3.6-10.5 8.6 0 1 .2 1.9.6 2.6C9 14 11.2 11.8 14.8 10.4c-2.9 2.1-4.8 4.4-5.5 7.3.7.2 1.5.3 2.2.3C16 18 18 12.6 18 6z"/></svg>
+                  </span>
+                  <svg class="menubar-icon" viewBox="0 0 24 24"><path d="M2 9a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  <svg class="menubar-icon battery" viewBox="0 0 30 14"><rect x="1" y="1" width="24" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="3" width="16" height="8" rx="1.5"/><rect x="26.5" y="4.5" width="2" height="5" rx="1"/></svg>
+                  <svg class="menubar-icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="18" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="7.5" r="1.6"/><circle cx="7.5" cy="16.5" r="1.6"/></svg>
+                  <span class="menubar-clock">Sat 3 Oct&nbsp;&nbsp;9:41 AM</span>
+                </div>
+              </div>
+
+              <!-- Illustrated Canva editor in Safari; export follows Share → Download. -->
+              <div class="app-window canva-window">
+                <div class="titlebar safari-titlebar">
+                  <span class="traffic-light red"></span><span class="traffic-light yellow"></span><span class="traffic-light green"></span>
+                  <span class="browser-navigation">‹ &nbsp; ›</span>
+                  <div class="browser-address"><span>⌁</span> canva.com <span>⟳</span></div>
+                  <span class="browser-actions">↑ &nbsp; ▧ &nbsp; +</span>
+                </div>
+                <div class="canva-topbar">
+                  <span class="canva-hamburger">☰</span><span>File</span><span>Resize <small>♛</small></span><span>Editing⌄</span>
+                  <span class="canva-undo">↶ &nbsp; ↷</span><span class="canva-saved">☁✓</span>
+                  <span class="canva-document-title">Spring Market Poster</span>
+                  <span class="canva-pro">♛ Try Pro</span><span class="canva-avatar">K</span><span class="canva-comments">▢</span>
+                  <button class="canva-share" data-target="share" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 16V3M7 8l5-5 5 5M4 13v8h16v-8"/></svg>Share</button>
+                </div>
+                <div class="canva-workspace">
+                  <aside class="canva-rail"><div class="canva-rail-item is-selected"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM9 4v16"/></svg><span>Design</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>Elements</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M4 5h16M12 5v15M8 20h8"/></svg><span>Text</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M5 8h14v12H5zM9 8V4h6v4"/></svg><span>Brand</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M5 17H3v-6h4l5-6 5 6h4v6h-2M12 10v11M8 14l4-4 4 4"/></svg><span>Uploads</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M5 19l3-8 9-8 4 4-8 9zM3 21h18"/></svg><span>Tools</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M3 7h8l2 3h8v10H3z"/></svg><span>Projects</span></div><div class="canva-rail-item "><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM17 14v6M14 17h6"/></svg><span>Apps</span></div></aside>
+                  <aside class="canva-design-panel">
+                    <div class="canva-search">⌕ <span>Search templates</span> ☷</div>
+                    <div class="canva-design-tabs"><b>Templates</b><span>Styles</span></div>
+                    <div class="canva-categories"><span>For you</span><span>Spring</span><span>Market</span></div>
+                    <p class="canva-panel-label">Recently used <span>See all</span></p>
+                    <div class="canva-template-grid">
+                      <div class="template-thumb template-market"><small>RIVERSIDE PARK</small><b>Spring<br>Market</b><span>Saturday · 9am</span></div>
+                      <div class="template-thumb template-floral"><small>YOU’RE INVITED</small><b>Garden<br>Party</b><span>✿ ✿ ✿</span></div>
+                    </div>
+                    <p class="canva-panel-label">All results</p>
+                    <div class="canva-template-grid">
+                      <div class="template-thumb template-orange"><small>FRESH & LOCAL</small><b>THE<br>WEEKEND<br>MARKET</b></div>
+                      <div class="template-thumb template-pink"><small>SAVE THE DATE</small><b>hello,<br>spring.</b><span>✳</span></div>
+                      <div class="template-thumb template-blue"><small>COMMUNITY EVENT</small><b>ART<br>IN THE<br>PARK</b></div>
+                      <div class="template-thumb template-cream"><small>COME TOGETHER</small><b>Sunday<br>Social</b><span>☀</span></div>
+                    </div>
+                  </aside>
+                  <div class="canva-canvas">
+                    <div class="canva-context-toolbar"><span class="canva-color-chip"></span><span>Animate</span><span class="toolbar-divider"></span><span>Position</span><span>◧</span></div>
+                    <div class="canva-page-label">Page 1 <span>↗ &nbsp; ▢ &nbsp; •••</span></div>
+                    <div class="canva-poster-selection">                    <div class="poster" data-target="poster">
+                      <span class="poster-sun"></span>
+                      <p class="poster-kicker">Riverside Park</p>
+                      <p class="poster-title">Spring<br>Market</p>
+                      <p class="poster-meta">Saturday · 9am – 2pm</p>
+                      <span class="poster-hill poster-hill-back"></span>
+                      <span class="poster-hill poster-hill-front"></span>
+                    </div>
+<i class="selection-handle top-left"></i><i class="selection-handle top-right"></i><i class="selection-handle bottom-left"></i><i class="selection-handle bottom-right"></i></div>
+                    <div class="canva-add-page">+ Add page</div>
+                  </div>
+                </div>
+                <div class="canva-bottom-bar"><span>☷ Notes</span><span>▱ Duration</span><span class="canva-zoom-slider"></span><span>35%</span><span>▣ Pages</span><span>1 / 1</span><span>⛶</span><span>ⓘ</span></div>
+                <div class="canva-share-panel" id="share-panel">
+                  <h3>Share design <span>⚙</span></h3><p class="canva-panel-label">People with access</p><div class="canva-search">⌕ Add people or groups</div><div class="canva-avatar share-avatar">K</div>
+                  <p class="canva-panel-label">Access level</p><div class="canva-access">♙ <span>Only you can access</span>⌄</div><div class="canva-copy-link">♧ &nbsp; Copy link</div>
+                  <div class="canva-share-options"><div data-target="download-option"><span>↓</span>Download</div><div><span>♧</span>Public view link</div><div><span>▱</span>Print with Canva</div><div><span>•••</span>See all</div></div>
+                </div>
+                <div class="canva-download-panel" id="download-panel">
+                  <h3>‹ &nbsp; Download <span>×</span></h3><p class="canva-panel-label">File type</p>
+                  <div class="export-format" data-target="format"><span id="format-value">JPG</span><span>⌄</span>
+                    <ul class="format-menu" id="format-menu"><li class="is-current">JPG <small>Small file size</small></li><li data-target="format-png">PNG <small>High quality image</small></li><li>PDF Standard</li><li>PDF Print</li><li>SVG ♛</li></ul>
+                  </div>
+                  <p class="canva-panel-label">Size <span>1 ×</span></p><div class="download-size-slider"></div><p class="download-dimensions">1,080 × 1,350 px</p>
+                  <p class="download-checkbox">□ <span>Limit file size</span> <small>♛</small></p><p class="download-checkbox">□ <span>Compress file (lower quality)</span> <small>♛</small></p><p class="download-checkbox">□ <span>Transparent background</span> <small>♛</small></p>
+                  <div class="download-settings">□ &nbsp; Save download settings</div><button class="export-button" data-target="export" tabindex="-1">Download</button>
+                </div>
+              </div>
+
+              <!-- Illustrated Excel for Mac, with real row filtering and preserved row numbers. -->
+              <div class="app-window excel-window" id="excel-window" hidden>
+                <div class="titlebar excel-titlebar"><span class="traffic-light red"></span><span class="traffic-light yellow"></span><span class="traffic-light green"></span><span class="excel-autosave">AutoSave <b>ON</b></span><span class="excel-quick-actions">▣ &nbsp; ↶ &nbsp; ↷</span><span class="window-title">October Invoices &nbsp;⌄</span><span class="excel-search">⌕ Search</span></div>
+                <div class="excel-ribbon-tabs"><b>Home</b><span>Insert</span><span>Draw</span><span>Page Layout</span><span>Formulas</span><span>Data</span><span>Review</span><span>View</span><span>Help</span><span class="excel-comments">▢ Comments</span><span class="excel-share">↥ Share</span></div>
+                <div class="excel-ribbon">
+                  <div class="excel-ribbon-group"><span class="excel-paste-icon">▤</span><span>Paste⌄</span><small>Clipboard</small></div>
+                  <div class="excel-ribbon-group excel-font-tools"><div><span>Aptos Narrow ⌄</span><span>11 ⌄</span></div><div><b>B</b><i>I</i><u>U</u><span>▦⌄</span><span>▰⌄</span><span>A̲⌄</span></div><small>Font</small></div>
+                  <div class="excel-ribbon-group"><div>≡ &nbsp; ≡ &nbsp; ≡ &nbsp; ↵ Wrap Text</div><div>⇤ &nbsp; ≡ &nbsp; ⇥ &nbsp; ▤ Merge & Center⌄</div><small>Alignment</small></div>
+                  <div class="excel-ribbon-group"><div>General &nbsp; &nbsp;⌄</div><div>$⌄ &nbsp; % &nbsp; , &nbsp; .00</div><small>Number</small></div>
+                  <div class="excel-ribbon-group"><div class="excel-ribbon-large">▦ &nbsp; ▦ &nbsp; ▦</div><div>Conditional &nbsp; Format as &nbsp; Cell</div><div>Formatting &nbsp; Table &nbsp; Styles</div><small>Styles</small></div>
+                  <div class="excel-ribbon-group"><div>⊞ &nbsp; ⊟ &nbsp; ▦</div><div>Insert &nbsp; Delete &nbsp; Format</div><small>Cells</small></div>
+                  <div class="excel-ribbon-group"><div>Σ AutoSum⌄</div><div>▽ Sort & Filter &nbsp;⌕ Find</div><small>Editing</small></div>
+                </div>
+                <div class="excel-formula-bar"><span>F3 ⌄</span><span>× &nbsp; ✓ &nbsp; <i>fx</i></span><div>Status</div></div>
+                <div class="excel-grid"><div class="excel-corner">◢</div><div class="excel-column-letter">A</div><div class="excel-column-letter">B</div><div class="excel-column-letter">C</div><div class="excel-column-letter">D</div><div class="excel-column-letter">E</div><div class="excel-column-letter">F</div><div class="excel-column-letter">G</div><div class="excel-column-letter">H</div><div class="excel-row-number">1</div><div class="excel-sheet-title">October invoices</div><div class="excel-row-number">2</div><div class="excel-sheet-subtitle">Accounts receivable · Updated October 3, 2026</div><div class="excel-row-number">3</div><div class="excel-table-heading">Invoice<span class="excel-filter-arrow" >⌄</span></div><div class="excel-table-heading">Client<span class="excel-filter-arrow" >⌄</span></div><div class="excel-table-heading excel-mobile-hidden">Issued<span class="excel-filter-arrow" >⌄</span></div><div class="excel-table-heading excel-mobile-hidden">Due date<span class="excel-filter-arrow" >⌄</span></div><div class="excel-table-heading excel-mobile-hidden">Amount<span class="excel-filter-arrow" >⌄</span></div><div class="excel-table-heading">Status<span class="excel-filter-arrow" data-target=excel-status>⌄</span></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-data-row" data-status="Paid"><div class="excel-row-number">4</div><div class="excel-cell  ">INV-1041</div><div class="excel-cell  ">Northstar Studio</div><div class="excel-cell  ">Sep 02, 2026</div><div class="excel-cell  ">Sep 16, 2026</div><div class="excel-cell excel-amount ">$1,250.00</div><div class="excel-cell  excel-status-cell status-paid">Paid</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Overdue"><div class="excel-row-number">5</div><div class="excel-cell  ">INV-1042</div><div class="excel-cell  ">Willow & Co.</div><div class="excel-cell  ">Sep 05, 2026</div><div class="excel-cell  ">Sep 19, 2026</div><div class="excel-cell excel-amount ">$840.00</div><div class="excel-cell  excel-status-cell status-overdue">Overdue</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Paid"><div class="excel-row-number">6</div><div class="excel-cell  ">INV-1043</div><div class="excel-cell  ">Fieldwork Design</div><div class="excel-cell  ">Sep 10, 2026</div><div class="excel-cell  ">Sep 24, 2026</div><div class="excel-cell excel-amount ">$2,100.00</div><div class="excel-cell  excel-status-cell status-paid">Paid</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Overdue"><div class="excel-row-number">7</div><div class="excel-cell  ">INV-1044</div><div class="excel-cell  ">Oak House</div><div class="excel-cell  ">Sep 12, 2026</div><div class="excel-cell  ">Sep 26, 2026</div><div class="excel-cell excel-amount ">$650.00</div><div class="excel-cell  excel-status-cell status-overdue">Overdue</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Pending"><div class="excel-row-number">8</div><div class="excel-cell  ">INV-1045</div><div class="excel-cell  ">Harbor Creative</div><div class="excel-cell  ">Sep 20, 2026</div><div class="excel-cell  ">Oct 04, 2026</div><div class="excel-cell excel-amount ">$1,480.00</div><div class="excel-cell  excel-status-cell status-pending">Pending</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Pending"><div class="excel-row-number">9</div><div class="excel-cell  ">INV-1046</div><div class="excel-cell  ">Sunday Goods</div><div class="excel-cell  ">Sep 22, 2026</div><div class="excel-cell  ">Oct 06, 2026</div><div class="excel-cell excel-amount ">$920.00</div><div class="excel-cell  excel-status-cell status-pending">Pending</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Overdue"><div class="excel-row-number">10</div><div class="excel-cell  ">INV-1047</div><div class="excel-cell  ">Meadow Works</div><div class="excel-cell  ">Sep 14, 2026</div><div class="excel-cell  ">Sep 28, 2026</div><div class="excel-cell excel-amount ">$1,750.00</div><div class="excel-cell  excel-status-cell status-overdue">Overdue</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-data-row" data-status="Pending"><div class="excel-row-number">11</div><div class="excel-cell  ">INV-1048</div><div class="excel-cell  ">Pine & Paper</div><div class="excel-cell  ">Sep 25, 2026</div><div class="excel-cell  ">Oct 09, 2026</div><div class="excel-cell excel-amount ">$560.00</div><div class="excel-cell  excel-status-cell status-pending">Pending</div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">12</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">13</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">14</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">15</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">16</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">17</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">18</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">19</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">20</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div><div class="excel-blank-row"><div class="excel-row-number">21</div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div><div class="excel-empty"></div></div></div>
+                <div class="excel-sheet-tabs"><span>‹ &nbsp; ›</span><b>Invoices</b><span>Summary</span><span>＋</span></div>
+                <div class="excel-statusbar"><span id="excel-statusbar-message">Ready</span><span>Accessibility: Good to go</span><span class="excel-statusbar-right">▦ &nbsp; ▣ &nbsp; − ━━━●━━ ＋ &nbsp; 100%</span></div>
+                <div class="excel-filter-panel" id="excel-filter-panel" hidden>
+                  <div class="excel-filter-title"><span>●</span>Status</div>
+                  <div class="excel-filter-body"><b>Sort</b><div class="excel-sort-actions"><span>A↓ Ascending</span><span>Z↓ Descending</span></div><div class="excel-filter-field">By color: <span>None ⌄</span></div><hr><b>Filter</b><div class="excel-filter-field">By color: <span>None ⌄</span></div><div class="excel-filter-field"><span>Choose One ⌄</span><span></span></div><div class="excel-filter-search">⌕ Search</div>
+                    <div class="excel-filter-values"><div data-target="excel-select-all"><span class="excel-checkbox is-checked">✓</span>(Select All)</div><div data-target="excel-overdue"><span class="excel-checkbox is-checked">✓</span>Overdue</div><div><span class="excel-checkbox is-checked">✓</span>Paid</div><div><span class="excel-checkbox is-checked">✓</span>Pending</div></div>
+                    <div class="excel-auto-apply">□ Auto Apply</div><div class="excel-filter-actions"><button data-target="excel-apply" tabindex="-1">Apply Filter</button><span>Clear Filter</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- macOS-style notification -->
+              <div class="mac-notification" id="mac-notification">
+                <span class="notification-icon"></span>
+                <div>
+                  <p class="notification-title">Export complete</p>
+                  <p class="notification-body">Spring-Market-Poster.png saved to Downloads</p>
+                </div>
+                <span class="notification-time">now</span>
+              </div>
+
+              <!-- Native macOS icon assets, exported locally at 128px. -->
+              <div class="dock">
+                <span class="dock-icon is-running" data-app-name="Finder"><img src="assets/dock/finder.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon is-running" data-app-name="Safari"><img src="assets/dock/safari.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon is-running" data-app-name="Messages"><img src="assets/dock/messages.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Mail"><img src="assets/dock/mail.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Maps"><img src="assets/dock/maps.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Photos"><img src="assets/dock/photos.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="FaceTime"><img src="assets/dock/facetime.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Reminders"><img src="assets/dock/reminders.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Notes"><img src="assets/dock/notes.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="Music"><img src="assets/dock/music.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon " data-app-name="App Store"><img src="assets/dock/app-store.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon is-running" data-app-name="System Settings"><img src="assets/dock/system-settings.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon" data-app-name="Microsoft Excel" data-target="excel-dock"><img src="assets/dock/excel.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-divider"></span>
+                <span class="dock-icon" data-app-name="Downloads"><img src="assets/dock/downloads.png" width="54" height="54" alt="" draggable="false"></span>
+                <span class="dock-icon" data-app-name="Trash"><img src="assets/dock/trash.png" width="54" height="54" alt="" draggable="false"></span>
+              </div>
+
+              <!-- The user's normal Mac pointer -->
+              <svg class="user-cursor" id="user-cursor" viewBox="0 0 24 24"><path d="M5 2.5v17.2l4.4-4.2 2.8 6.5 3.1-1.3-2.8-6.4h6.1z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              <span class="click-ripple" id="click-ripple"></span>
+
+              <!-- Sage's cursor and its label bubble -->
+              <div class="sage-cursor" id="sage-cursor" data-mode="following">
+                <span class="sage-pulse"></span>
+                <svg class="sage-triangle" viewBox="0 0 16 16"><path d="M8 1.4 L14.6 13.8 L1.4 13.8 Z" transform="rotate(-35 8 8)"/></svg>
+                <span class="sage-waveform"><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="sage-spinner"></span>
+              </div>
+              <div class="sage-bubble" id="sage-bubble"></div>
+            </div>
+          </div>
+          <figcaption class="demo-caption" id="demo-caption">
+            <span class="caption-speaker">You</span> “how do I export this as a PNG?”
+          </figcaption>
+        </figure>
+        <div class="demo-scenarios" role="group" aria-label="Choose a walkthrough"><button type="button" data-demo="canva" aria-pressed="true">Canva <span>Export a poster</span></button><button type="button" data-demo="excel" aria-pressed="false">Excel <span>Find overdue invoices</span></button></div>
+        <div class="demo-controls" aria-label="Demo playback">
+          <button type="button" id="demo-pause" aria-pressed="false">Pause demo</button>
+          <button type="button" id="demo-replay">Replay</button>
+          <button type="button" id="demo-sound" aria-pressed="false">Play with sound</button>
+        </div>
+        <p class="demo-note" id="demo-note">Illustrated demo · Sound is off. Sage points; you make every click.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="page-width site-footer-inner">
+      <span>© 2026 Keside Onyeocha</span>
+      <a href="privacy.html">Privacy &amp; your data</a>
+    </div>
+  </footer>
+
+  <script src="excel-demo.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

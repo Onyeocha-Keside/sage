@@ -1,162 +1,121 @@
-Update: April 27, 2026.
+# Sage
 
-Hi there! I'm Farza, the guy that made Clicky.
+**An AI companion that lives next to your cursor.** Hold **Control + Option**, ask a question out loud, and Sage looks at your screen, talks you through the answer, and flies its cursor to each thing it mentions as it says it.
 
-The existing codebase remains open source. Tinker with it, make it yours, start a company out of it, do whatever you want I don't mind. But, for all the new stuff I'm hacking on, gonna keep it private. To get the latest Clicky, you can go [here](https://www.heyclicky.com/).
+- "What am I looking at?" → a guided tour, with the cursor hopping between parts of the app
+- "How do I export this?" → step-by-step help, pointing at each button
+- "What does this error mean?" → a plain-English explanation of what's on screen
 
-I also tweeted about this [here](https://x.com/FarzaTV/status/2043402737828962489).
+Built on macOS (SwiftUI + AppKit) with Claude for vision and reasoning.
 
-Go crazy with this repo!! It's an MIT license.
+---
 
-# Hi, this is Clicky.
-It's an AI teacher that lives as a buddy next to your cursor. It can see your screen, talk to you, and even point at stuff. Kinda like having a real teacher next to you.
+## What it costs to run
 
-Download it [here](https://www.clicky.so/) for free.
+| Piece | Cost |
+| --- | --- |
+| Claude (Sonnet 5.5) | about **$0.01 per question**, from your Anthropic credits |
+| Speech-to-text | **free** (Apple, on-device) |
+| Voice | **free** Mac voice, or ElevenLabs (optional; its free tier covers a demo video) |
+| Server (Cloudflare Worker) | **free** tier |
 
-Here's the [original tweet](https://x.com/FarzaTV/status/2041314633978659092) that kinda blew up for a demo for more context.
+Set a monthly spend limit in the [Anthropic Console](https://console.anthropic.com) (Settings → Limits). It's the best safety net against surprise bills.
 
-![Clicky — an ai buddy that lives on your mac](clicky-demo.gif)
+---
 
-This is the open-source version of Clicky for those that want to hack on it, build their own features, or just see how it works under the hood.
+## Setup
 
-## Get started with Claude Code
+You need: a Mac on macOS 14.2+, **Xcode** (free in the App Store), **Node.js**, and an **Anthropic API key**.
 
-The fastest way to get this running is with [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
-
-Once you get Claude running, paste this:
-
-```
-Hi Claude.
-
-Clone https://github.com/farzaa/clicky.git into my current directory.
-
-Then read the CLAUDE.md. I want to get Clicky running locally on my Mac.
-
-Help me set up everything — the Cloudflare Worker with my own API keys, the proxy URLs, and getting it building in Xcode. Walk me through it.
-```
-
-That's it. It'll clone the repo, read the docs, and walk you through the whole setup. Once you're running you can just keep talking to it — build features, fix bugs, whatever. Go crazy.
-
-## Manual setup
-
-If you want to do it yourself, here's the deal.
-
-### Prerequisites
-
-- macOS 14.2+ (for ScreenCaptureKit)
-- Xcode 15+
-- Node.js 18+ (for the Cloudflare Worker)
-- A [Cloudflare](https://cloudflare.com) account (free tier works)
-- API keys for: [Anthropic](https://console.anthropic.com), [AssemblyAI](https://www.assemblyai.com), [ElevenLabs](https://elevenlabs.io)
-
-### 1. Set up the Cloudflare Worker
-
-The Worker is a tiny proxy that holds your API keys. The app talks to the Worker, the Worker talks to the APIs. This way your keys never ship in the app binary.
+### 1. Run the server locally
 
 ```bash
 cd worker
 npm install
 ```
 
-Now add your secrets. Wrangler will prompt you to paste each one:
-
-```bash
-npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put ASSEMBLYAI_API_KEY
-npx wrangler secret put ELEVENLABS_API_KEY
-```
-
-For the ElevenLabs voice ID, open `wrangler.toml` and set it there (it's not sensitive):
-
-```toml
-[vars]
-ELEVENLABS_VOICE_ID = "your-voice-id-here"
-```
-
-Deploy it:
-
-```bash
-npx wrangler deploy
-```
-
-It'll give you a URL like `https://your-worker-name.your-subdomain.workers.dev`. Copy that.
-
-### 2. Run the Worker locally (for development)
-
-If you want to test changes to the Worker without deploying:
-
-```bash
-cd worker
-npx wrangler dev
-```
-
-This starts a local server (usually `http://localhost:8787`) that behaves exactly like the deployed Worker. You'll need to create a `.dev.vars` file in the `worker/` directory with your keys:
+Open `worker/.dev.vars` (git-ignored, never committed) and fill in your key:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
-ASSEMBLYAI_API_KEY=...
-ELEVENLABS_API_KEY=...
-ELEVENLABS_VOICE_ID=...
+SAGE_APP_KEY=<a long random string; generate with: openssl rand -hex 24>
+# ELEVENLABS_API_KEY=...   (optional)
 ```
 
-Then update the proxy URLs in the Swift code to point to `http://localhost:8787` instead of the deployed Worker URL while developing. Grep for `clicky-proxy` to find them all.
-
-### 3. Update the proxy URLs in the app
-
-The app has the Worker URL hardcoded in a few places. Search for `your-worker-name.your-subdomain.workers.dev` and replace it with your Worker URL:
+Start it:
 
 ```bash
-grep -r "clicky-proxy" leanring-buddy/
+npx wrangler dev
 ```
 
-You'll find it in:
-- `CompanionManager.swift` — Claude chat + ElevenLabs TTS
-- `AssemblyAIStreamingTranscriptionProvider.swift` — AssemblyAI token endpoint
+Check it at http://localhost:8787/health. It should say `"claudeConfigured": true`.
 
-### 4. Open in Xcode and run
+### 2. Point the app at the server
+
+Copy `config/SageSecrets.example.plist` to `leanring-buddy/App/SageSecrets.plist` (git-ignored) and set:
+
+- `WorkerBaseURL`: `http://localhost:8787` for now
+- `AppKey`: the same value as `SAGE_APP_KEY`
+
+### 3. Build and run
 
 ```bash
 open leanring-buddy.xcodeproj
 ```
 
-In Xcode:
-1. Select the `leanring-buddy` scheme (yes, the typo is intentional, long story)
-2. Set your signing team under Signing & Capabilities
-3. Hit **Cmd + R** to build and run
+In Xcode: select the **leanring-buddy** scheme (the folder name is a legacy typo, the app is called Sage). Under *Signing & Capabilities*, pick your own Team (a free Apple ID works). Press **Cmd + R**.
 
-The app will appear in your menu bar (not the dock). Click the icon to open the panel, grant the permissions it asks for, and you're good.
+A leaf icon appears in the menu bar. Grant the permissions it asks for, hit **Start**, and Sage introduces itself.
 
-### Permissions the app needs
+> **Tip:** the default Mac voices sound robotic. Download a Premium voice in System Settings → Accessibility → Spoken Content → System Voice → Manage Voices (for example "Zoe (Premium)"). Sage picks the best one installed automatically.
 
-- **Microphone** — for push-to-talk voice capture
-- **Accessibility** — for the global keyboard shortcut (Control + Option)
-- **Screen Recording** — for taking screenshots when you use the hotkey
-- **Screen Content** — for ScreenCaptureKit access
+### 4. Deploy the server (so it works off your laptop)
 
-## Architecture
-
-If you want the full technical breakdown, read `CLAUDE.md`. But here's the short version:
-
-**Menu bar app** (no dock icon) with two `NSPanel` windows — one for the control panel dropdown, one for the full-screen transparent cursor overlay. Push-to-talk streams audio over a websocket to AssemblyAI, sends the transcript + screenshot to Claude via streaming SSE, and plays the response through ElevenLabs TTS. Claude can embed `[POINT:x,y:label:screenN]` tags in its responses to make the cursor fly to specific UI elements across multiple monitors. All three APIs are proxied through a Cloudflare Worker.
-
-## Project structure
-
-```
-leanring-buddy/          # Swift source (yes, the typo stays)
-  CompanionManager.swift    # Central state machine
-  CompanionPanelView.swift  # Menu bar panel UI
-  ClaudeAPI.swift           # Claude streaming client
-  ElevenLabsTTSClient.swift # Text-to-speech playback
-  OverlayWindow.swift       # Blue cursor overlay
-  AssemblyAI*.swift         # Real-time transcription
-  BuddyDictation*.swift     # Push-to-talk pipeline
-worker/                  # Cloudflare Worker proxy
-  src/index.ts              # Three routes: /chat, /tts, /transcribe-token
-CLAUDE.md                # Full architecture doc (agents read this)
+```bash
+cd worker
+npx wrangler login
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put SAGE_APP_KEY
+npx wrangler secret put ELEVENLABS_API_KEY   # optional
+npx wrangler deploy
 ```
 
-## Contributing
+Put the `https://sage-api.<you>.workers.dev` URL into `SageSecrets.plist` and rebuild.
 
-PRs welcome. If you're using Claude Code, it already knows the codebase — just tell it what you want to build and point it at `CLAUDE.md`.
+---
 
-Got feedback? DM me on X [@farzatv](https://x.com/farzatv).
+## How it works
+
+```
+hold Control+Option ──► mic → Apple Speech (on-device) ──► transcript
+                                                              │
+release ──► screenshot every display ──► Worker /chat ──► Claude (streaming)
+                                                              │
+     ┌────────────────────────────────────────────────────────┘
+     ▼
+ split the stream into sentences + [POINT:x,y:label] tags
+     │
+     ├─► speak each sentence the moment it's complete (Mac voice or ElevenLabs)
+     └─► when a sentence starts playing, fly the cursor to its tagged element
+```
+
+The Worker holds the API keys, fixes the model and prompts, checks the app key, and rate-limits each IP address, so a leaked app key can't be used as a free Claude proxy.
+
+## Project layout
+
+```
+leanring-buddy/                Mac app (folder name is legacy; the app is Sage)
+  App/                         entry point, configuration
+  Companion/                   the conductor + reply parsing + permissions
+  Services/                    Claude, screen capture, speech in/out, hotkey
+  UI/                          menu bar panel, cursor overlay, design system
+leanring-buddyTests/           unit tests (Cmd + U)
+worker/                        Cloudflare Worker: /chat, /tts, prompts
+config/                        example secrets file
+```
+
+See `AGENTS.md` for the full architecture notes.
+
+## Credits
+
+Started from [Clicky](https://github.com/farzaa/clicky) by Farza (MIT license). See `LICENSE`.

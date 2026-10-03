@@ -1,8 +1,12 @@
-worker/node_modules/
-worker/.dev.vars
 .DS_Store
-*.xcuserstate
 build/
-releases/
+xcuserdata/
+*.xcuserstate
+
+# Secrets: never commit these
+leanring-buddy/App/SageSecrets.plist
+worker/.dev.vars
+
+worker/node_modules/
+worker/.wrangler/
 .claude/
-coding-plans/

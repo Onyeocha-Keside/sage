@@ -1,6 +1,20 @@
-name = "clicky-proxy"
+name = "sage-api"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-09-01"
 
 [vars]
-ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"
+# Any voice from your ElevenLabs "Voices" page. Only used when the Mac app's
+# voice is set to ElevenLabs. Not a secret.
+ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
+
+# Per-IP rate limit: at most 20 requests per minute. Free on Cloudflare.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+# Waitlist signups from the landing page. List them with:
+#   npx wrangler kv key list --binding WAITLIST --remote
+[[kv_namespaces]]
+binding = "WAITLIST"
+id = "97a6a008b7e745ef8490bc03f0f9a548"
