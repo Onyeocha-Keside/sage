@@ -43,7 +43,7 @@ final class OverlayWindowManager {
 
     /// Creates a fresh overlay on every screen. `isFirstAppearance` plays the
     /// "hey, i'm sage" intro on whichever screen the mouse is on.
-    func showOverlay(onScreens screens: [NSScreen], isFirstAppearance: Bool, companionManager: CompanionManager) {
+    func showOverlay(onScreens screens: [NSScreen], isFirstAppearance: Bool, sessionCoordinator: SageSessionCoordinator) {
         hideOverlay()
 
         for screen in screens {
@@ -51,7 +51,7 @@ final class OverlayWindowManager {
             let cursorHostingView = NSHostingView(rootView: SageCursorView(
                 screenFrame: screen.frame,
                 isFirstAppearance: isFirstAppearance,
-                companionManager: companionManager
+                sessionCoordinator: sessionCoordinator
             ))
             cursorHostingView.frame = screen.frame
             overlayWindow.contentView = cursorHostingView

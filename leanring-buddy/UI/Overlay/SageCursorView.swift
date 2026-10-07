@@ -26,7 +26,7 @@ private enum CursorNavigationMode {
 struct SageCursorView: View {
     let screenFrame: CGRect
     let isFirstAppearance: Bool
-    @ObservedObject var companionManager: CompanionManager
+    @ObservedObject var sessionCoordinator: SageSessionCoordinator
 
     /// Sage sits just below and to the right of the real mouse pointer.
     private static let offsetFromMouse = CGPoint(x: 35, y: 25)
@@ -56,10 +56,10 @@ struct SageCursorView: View {
     @State private var pointingBubbleOpacity: Double = 0
     @State private var pointingBubbleScale: CGFloat = 1
 
-    init(screenFrame: CGRect, isFirstAppearance: Bool, companionManager: CompanionManager) {
+    init(screenFrame: CGRect, isFirstAppearance: Bool, sessionCoordinator: SageSessionCoordinator) {
         self.screenFrame = screenFrame
         self.isFirstAppearance = isFirstAppearance
-        self.companionManager = companionManager
+        self.sessionCoordinator = sessionCoordinator
 
         // Start at the mouse so the cursor doesn't flash at (0, 0) first.
         let mouseLocation = NSEvent.mouseLocation
@@ -83,16 +83,16 @@ struct SageCursorView: View {
                 .opacity(isMouseOnThisScreen ? welcomeBubbleOpacity : 0)
                 .animation(.easeOut(duration: 0.4), value: welcomeBubbleOpacity)
 
-            speechBubbleNextToCursor(text: companionManager.onboardingPromptText)
-                .opacity(isMouseOnThisScreen && navigationMode == .followingCursor ? companionManager.onboardingPromptOpacity : 0)
-                .animation(.easeOut(duration: 0.3), value: companionManager.onboardingPromptOpacity)
+            speechBubbleNextToCursor(text: sessionCoordinator.onboardingPromptText)
+                .opacity(isMouseOnThisScreen && navigationMode == .followingCursor ? sessionCoordinator.onboardingPromptOpacity : 0)
+                .animation(.easeOut(duration: 0.3), value: sessionCoordinator.onboardingPromptOpacity)
 
             speechBubbleNextToCursor(text: pointingBubbleText, popInScale: pointingBubbleScale)
                 .opacity(navigationMode == .pointingAtTarget ? pointingBubbleOpacity : 0)
                 .animation(.easeOut(duration: 0.4), value: pointingBubbleOpacity)
                 .animation(.spring(response: 0.4, dampingFraction: 0.6), value: pointingBubbleScale)
 
-            if companionManager.isFollowingAlong && isCursorVisibleOnThisScreen {
+            if sessionCoordinator.isFollowingAlong && isCursorVisibleOnThisScreen {
                 FollowAlongPulseView()
                     .position(cursorPosition)
                     .animation(navigationMode == .followingCursor ? Self.followSpring : nil, value: cursorPosition)
@@ -103,29 +103,29 @@ struct SageCursorView: View {
             // cross-fade, so SwiftUI never removes and re-inserts them (which
             // makes the cursor visibly pop).
             CursorTriangle()
-                .fill(DS.Colors.cursor)
+                .fill(CursorAppearance.Colors.cursor)
                 .frame(width: 16, height: 16)
                 .rotationEffect(.degrees(triangleRotationDegrees))
-                .shadow(color: DS.Colors.cursor, radius: 8 + (flightScale - 1) * 20)
+                .shadow(color: CursorAppearance.Colors.cursor, radius: 8 + (flightScale - 1) * 20)
                 .scaleEffect(flightScale)
                 .opacity(isCursorVisibleOnThisScreen && isShowingTriangle ? cursorOpacity : 0)
                 .position(cursorPosition)
                 // While flying, a timer moves the cursor every frame, so no implicit animation.
                 .animation(navigationMode == .followingCursor ? Self.followSpring : nil, value: cursorPosition)
-                .animation(.easeIn(duration: 0.25), value: companionManager.voiceState)
+                .animation(.easeIn(duration: 0.25), value: sessionCoordinator.voiceState)
                 .animation(navigationMode == .flying ? nil : .easeInOut(duration: 0.3), value: triangleRotationDegrees)
 
-            ListeningWaveformView(audioPowerLevel: companionManager.currentAudioPowerLevel)
-                .opacity(isCursorVisibleOnThisScreen && companionManager.voiceState == .listening ? cursorOpacity : 0)
+            ListeningWaveformView(audioPowerLevel: sessionCoordinator.currentAudioPowerLevel)
+                .opacity(isCursorVisibleOnThisScreen && sessionCoordinator.voiceState == .listening ? cursorOpacity : 0)
                 .position(cursorPosition)
                 .animation(Self.followSpring, value: cursorPosition)
-                .animation(.easeIn(duration: 0.15), value: companionManager.voiceState)
+                .animation(.easeIn(duration: 0.15), value: sessionCoordinator.voiceState)
 
             ThinkingSpinnerView()
-                .opacity(isCursorVisibleOnThisScreen && companionManager.voiceState == .processing ? cursorOpacity : 0)
+                .opacity(isCursorVisibleOnThisScreen && sessionCoordinator.voiceState == .processing ? cursorOpacity : 0)
                 .position(cursorPosition)
                 .animation(Self.followSpring, value: cursorPosition)
-                .animation(.easeIn(duration: 0.15), value: companionManager.voiceState)
+                .animation(.easeIn(duration: 0.15), value: sessionCoordinator.voiceState)
         }
         .frame(width: screenFrame.width, height: screenFrame.height)
         .ignoresSafeArea()
@@ -134,7 +134,7 @@ struct SageCursorView: View {
             mouseTrackingTimer?.invalidate()
             flightAnimationTimer?.invalidate()
         }
-        .onChange(of: companionManager.currentPointingTarget) { _, newPointingTarget in
+        .onChange(of: sessionCoordinator.currentPointingTarget) { _, newPointingTarget in
             handleNewPointingTarget(newPointingTarget)
         }
     }
@@ -144,7 +144,7 @@ struct SageCursorView: View {
     /// The triangle shows when idle or speaking. While listening or thinking,
     /// the waveform or spinner takes its place.
     private var isShowingTriangle: Bool {
-        companionManager.voiceState == .idle || companionManager.voiceState == .responding
+        sessionCoordinator.voiceState == .idle || sessionCoordinator.voiceState == .responding
     }
 
     /// Only one screen shows the cursor at a time: the one with the mouse,
@@ -153,7 +153,7 @@ struct SageCursorView: View {
         switch navigationMode {
         case .followingCursor:
             // Another screen is handling a target, so stay hidden to avoid two cursors.
-            if companionManager.currentPointingTarget != nil {
+            if sessionCoordinator.currentPointingTarget != nil {
                 return false
             }
             return isMouseOnThisScreen
@@ -209,7 +209,7 @@ struct SageCursorView: View {
                 welcomeBubbleOpacity = 0
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     welcomeText = ""
-                    companionManager.welcomeAnimationDidFinish()
+                    sessionCoordinator.welcomeAnimationDidFinish()
                 }
             }
         }
@@ -325,8 +325,8 @@ struct SageCursorView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + delaySeconds) {
             guard navigationMode == .pointingAtTarget, activeTargetID == targetID else { return }
 
-            let isStillTalkingAboutThisTarget = companionManager.isReplyInProgress
-                && companionManager.currentPointingTarget?.id == targetID
+            let isStillTalkingAboutThisTarget = sessionCoordinator.isReplyInProgress
+                && sessionCoordinator.currentPointingTarget?.id == targetID
             if isStillTalkingAboutThisTarget {
                 holdPointingThenFlyHome(targetID: targetID, delaySeconds: 0.3)
                 return
@@ -356,7 +356,7 @@ struct SageCursorView: View {
         let finishedTargetID = activeTargetID
         resetToFollowingMouse()
         if let finishedTargetID {
-            companionManager.clearPointingTarget(ifStillTargetID: finishedTargetID)
+            sessionCoordinator.clearPointingTarget(ifStillTargetID: finishedTargetID)
         }
     }
 

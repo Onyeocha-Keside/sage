@@ -20,13 +20,13 @@ extension Notification.Name {
 
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
-    private let companionManager: CompanionManager
+    private let sessionCoordinator: SageSessionCoordinator
     private let statusItem: NSStatusItem
     private let statusMenu = NSMenu()
     private var dismissMenuObserver: NSObjectProtocol?
 
-    init(companionManager: CompanionManager) {
-        self.companionManager = companionManager
+    init(sessionCoordinator: SageSessionCoordinator) {
+        self.sessionCoordinator = sessionCoordinator
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
@@ -67,12 +67,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Building The Menu
 
-    private var permissions: PermissionsCoordinator { companionManager.permissions }
+    private var permissions: PermissionsCoordinator { sessionCoordinator.permissions }
 
     private var isFullySetUp: Bool {
         AppConfiguration.isConfigured
             && permissions.allPermissionsGranted
-            && companionManager.hasCompletedOnboarding
+            && sessionCoordinator.hasCompletedOnboarding
     }
 
     private func rebuildMenuItems() {
@@ -81,6 +81,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         statusMenu.removeAllItems()
 
         addStatusHeader()
+        addAccessAndShortcutItems()
         statusMenu.addItem(.separator())
 
         if isFullySetUp {
@@ -89,7 +90,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             addSetupItems()
         }
 
-        if let dictationErrorMessage = companionManager.dictationManager.lastErrorMessage {
+        if let dictationErrorMessage = sessionCoordinator.dictationManager.lastErrorMessage {
             statusMenu.addItem(.separator())
             addInformationItem(dictationErrorMessage, symbolName: "exclamationmark.triangle")
         }
@@ -107,11 +108,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if !isFullySetUp {
             statusTitle = "Sage needs setup"
             statusDotColor = .systemOrange
-        } else if companionManager.isFollowingAlong {
+        } else if sessionCoordinator.isFollowingAlong {
             statusTitle = "Sage is following along"
             statusDotColor = .systemGreen
         } else {
-            switch companionManager.voiceState {
+            switch sessionCoordinator.voiceState {
             case .idle:
                 statusTitle = "Sage is ready"
                 statusDotColor = .systemGreen
@@ -133,6 +134,64 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         statusMenu.addItem(statusLineItem)
     }
 
+    private func addAccessAndShortcutItems() {
+        let shortcutItem = NSMenuItem(title: "Shortcut", action: nil, keyEquivalent: "")
+        shortcutItem.image = Self.symbolImage("keyboard")
+        let shortcutMenu = NSMenu()
+        for shortcut in PushToTalkShortcut.allCases {
+            let item = NSMenuItem(title: shortcut.displayText, action: #selector(selectShortcut(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = shortcut.rawValue
+            item.state = PushToTalkShortcut.selected == shortcut ? .on : .off
+            shortcutMenu.addItem(item)
+        }
+        shortcutItem.submenu = shortcutMenu
+        statusMenu.addItem(shortcutItem)
+        addActionItem("Enter Access Token…", symbolName: "key", action: #selector(enterAccessToken))
+        if AccessTokenStore.token != nil {
+            addActionItem("Remove Access Token", action: #selector(removeAccessToken))
+        }
+    }
+
+    @objc private func selectShortcut(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let shortcut = PushToTalkShortcut(rawValue: rawValue) else { return }
+        sessionCoordinator.selectShortcut(shortcut)
+    }
+
+    @objc private func enterAccessToken() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Sage access token"
+        alert.informativeText = "Enter your individual beta access token. It is stored in this Mac’s Keychain."
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try AccessTokenStore.save(field.stringValue)
+            sessionCoordinator.accessCredentialsDidChange()
+        } catch {
+            let failure = NSAlert()
+            failure.messageText = "Couldn’t save access token"
+            failure.informativeText = error.localizedDescription
+            failure.runModal()
+        }
+    }
+
+    @objc private func removeAccessToken() {
+        do {
+            try AccessTokenStore.remove()
+            sessionCoordinator.accessCredentialsDidChange()
+        } catch {
+            let failure = NSAlert()
+            failure.messageText = "Couldn’t remove access token"
+            failure.informativeText = error.localizedDescription
+            failure.runModal()
+        }
+    }
+
     private func addReadyItems() {
         addInformationItem("Hold \(GlobalPushToTalkShortcutMonitor.shortcutDisplayText) to ask anything", symbolName: "keyboard")
         statusMenu.addItem(.separator())
@@ -146,14 +205,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let voiceOptionItem = NSMenuItem(title: voiceOption.displayName, action: #selector(selectVoice(_:)), keyEquivalent: "")
             voiceOptionItem.target = self
             voiceOptionItem.representedObject = voiceOption.rawValue
-            voiceOptionItem.state = companionManager.selectedVoice == voiceOption ? .on : .off
+            voiceOptionItem.state = sessionCoordinator.selectedVoice == voiceOption ? .on : .off
             voiceSubmenu.addItem(voiceOptionItem)
         }
         voiceMenuItem.submenu = voiceSubmenu
         statusMenu.addItem(voiceMenuItem)
 
         let soundsItem = addActionItem("Sounds", symbolName: "speaker.wave.2", action: #selector(toggleSoundEffects))
-        soundsItem.state = companionManager.areSoundEffectsEnabled ? .on : .off
+        soundsItem.state = sessionCoordinator.areSoundEffectsEnabled ? .on : .off
 
         statusMenu.addItem(.separator())
         addActionItem("Replay Intro", symbolName: "play.circle", action: #selector(replayIntro))
@@ -161,7 +220,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func addSetupItems() {
         if !AppConfiguration.isConfigured {
-            addInformationItem("Server not configured (see README)", symbolName: "exclamationmark.triangle")
+            addInformationItem("Server or access token missing (see README)", symbolName: "exclamationmark.triangle")
             statusMenu.addItem(.separator())
         }
 
@@ -211,14 +270,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             )
         }
 
-        if permissions.allPermissionsGranted && !companionManager.hasCompletedOnboarding {
+        if permissions.allPermissionsGranted && !sessionCoordinator.hasCompletedOnboarding {
             statusMenu.addItem(.separator())
             let startItem = addActionItem("Start Sage", symbolName: "sparkles", action: #selector(startSage))
             startItem.isEnabled = AppConfiguration.isConfigured
         }
 
         statusMenu.addItem(.separator())
-        addInformationItem("Sage only looks at your screen while you hold the shortcut.", symbolName: "lock")
+        addInformationItem("Sage captures screens when you ask and during follow-along.", symbolName: "lock")
     }
 
     // MARK: - Item Helpers
@@ -275,19 +334,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func selectVoice(_ sender: NSMenuItem) {
         guard let voiceRawValue = sender.representedObject as? String,
               let voiceOption = SageVoiceOption(rawValue: voiceRawValue) else { return }
-        companionManager.selectVoice(voiceOption)
+        sessionCoordinator.selectVoice(voiceOption)
     }
 
     @objc private func toggleSoundEffects() {
-        companionManager.setSoundEffectsEnabled(!companionManager.areSoundEffectsEnabled)
+        sessionCoordinator.setSoundEffectsEnabled(!sessionCoordinator.areSoundEffectsEnabled)
     }
 
     @objc private func replayIntro() {
-        companionManager.replayIntro()
+        sessionCoordinator.replayIntro()
     }
 
     @objc private func startSage() {
-        companionManager.startOnboarding()
+        sessionCoordinator.startOnboarding()
     }
 
     @objc private func requestMicrophone() {

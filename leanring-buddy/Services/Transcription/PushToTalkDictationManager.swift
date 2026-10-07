@@ -37,6 +37,7 @@ final class PushToTalkDictationManager: ObservableObject {
     private var finalizeFallbackWorkItem: DispatchWorkItem?
     /// Changes on every start/stop so a slow start can tell it was superseded.
     private var currentStartRequestIdentifier = UUID()
+    private var currentRecognitionIdentifier = UUID()
 
     // MARK: - Warm Up
 
@@ -146,17 +147,20 @@ final class PushToTalkDictationManager: ObservableObject {
     // MARK: - Session Plumbing
 
     private func startRecognitionSession() throws {
+        let recognitionIdentifier = UUID()
+        currentRecognitionIdentifier = recognitionIdentifier
         activeTranscriptionSession?.cancel()
 
         activeTranscriptionSession = try AppleSpeechTranscriber.startSession(
             onTranscriptUpdate: { [weak self] transcriptText in
                 Task { @MainActor in
+                    guard self?.currentRecognitionIdentifier == recognitionIdentifier else { return }
                     self?.latestRecognizedText = transcriptText
                 }
             },
             onFinalTranscriptReady: { [weak self] transcriptText in
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, self.currentRecognitionIdentifier == recognitionIdentifier else { return }
                     self.latestRecognizedText = transcriptText
                     if self.isFinalizingTranscript {
                         self.finishCurrentSessionIfNeeded()
@@ -165,6 +169,7 @@ final class PushToTalkDictationManager: ObservableObject {
             },
             onError: { [weak self] error in
                 Task { @MainActor in
+                    guard self?.currentRecognitionIdentifier == recognitionIdentifier else { return }
                     self?.handleRecognitionError(error)
                 }
             }
@@ -227,12 +232,12 @@ final class PushToTalkDictationManager: ObservableObject {
             logger.notice("Recording finished but no speech was recognized")
             return
         }
-        print("🗣️ Transcript: \(finalTranscript)")
-        logger.notice("Transcript: \(finalTranscript, privacy: .public)")
+        logger.notice("Recording transcribed successfully")
         transcriptCallback?(finalTranscript)
     }
 
     private func tearDownAudioAndSession() {
+        currentRecognitionIdentifier = UUID()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         activeTranscriptionSession?.cancel()

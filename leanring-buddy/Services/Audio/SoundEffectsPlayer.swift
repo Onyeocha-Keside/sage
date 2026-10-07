@@ -1,5 +1,5 @@
 //
-//  SoundEffects.swift
+//  SoundEffectsPlayer.swift
 //  Sage
 //
 //  Small audio cues so you can tell what Sage is doing without looking.

@@ -8,6 +8,9 @@ on:
     branches: [main]
     paths:
       - "worker/src/**"
+      - "worker/tests/**"
+      - "worker/scripts/test.mjs"
+      - "worker/tsconfig.json"
       - "worker/wrangler.toml"
       - "worker/package.json"
       - "worker/package-lock.json"
@@ -34,6 +37,8 @@ jobs:
           cache-dependency-path: worker/package-lock.json
 
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
 
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy

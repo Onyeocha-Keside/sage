@@ -1,5 +1,5 @@
 //
-//  CompanionManager.swift
+//  SageSessionCoordinator.swift
 //  Sage
 //
 //  The conductor. Runs the full loop:
@@ -18,35 +18,11 @@ import Foundation
 import os
 import SwiftUI
 
-enum CompanionVoiceState {
-    case idle
-    case listening
-    case processing
-    case responding
-}
-
-/// Which voice Sage speaks with. Persisted across launches.
-enum SageVoiceOption: String, CaseIterable, Identifiable {
-    /// macOS's built-in voice. Free.
-    case mac
-    /// ElevenLabs through the Worker. Sounds great, costs credits.
-    case elevenLabs
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .mac: return "Mac"
-        case .elevenLabs: return "ElevenLabs"
-        }
-    }
-}
-
 @MainActor
-final class CompanionManager: ObservableObject {
+final class SageSessionCoordinator: ObservableObject {
     // MARK: - Published State
 
-    @Published private(set) var voiceState: CompanionVoiceState = .idle
+    @Published private(set) var voiceState: SessionVoiceState = .idle
     @Published private(set) var currentAudioPowerLevel: CGFloat = 0
     @Published private(set) var isOverlayVisible = false
 
@@ -70,7 +46,7 @@ final class CompanionManager: ObservableObject {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Self.hasCompletedOnboardingDefaultsKey) }
     }
 
-    /// The "hold control + option and ask me anything" hint typed out next
+    /// The "hold your shortcut and ask me anything" hint typed out next
     /// to the cursor after the onboarding demo.
     @Published private(set) var onboardingPromptText = ""
     @Published private(set) var onboardingPromptOpacity: Double = 0
@@ -81,7 +57,8 @@ final class CompanionManager: ObservableObject {
     let dictationManager = PushToTalkDictationManager()
     private let shortcutMonitor = GlobalPushToTalkShortcutMonitor()
     private let overlayWindowManager = OverlayWindowManager()
-    private let claudeClient = ClaudeClient()
+    private let apiClient = SageAPIClient()
+    private lazy var replyExecutor = ReplyExecutor(client: apiClient)
     private let macVoice = AppleSpeechVoice()
     private let elevenLabsVoice = ElevenLabsSpeechVoice()
     private lazy var speechPlaybackQueue = SpeechPlaybackQueue(fallbackVoice: macVoice)
@@ -93,22 +70,19 @@ final class CompanionManager: ObservableObject {
 
     private static let hasCompletedOnboardingDefaultsKey = "hasCompletedOnboarding"
     private static let selectedVoiceDefaultsKey = "selectedVoice"
-    private static let maximumRememberedTurns = 10
-    private static let onboardingPromptMessage = "hold control + option and ask me anything"
-    /// A guided task stops after this many look-again steps, as a safety net.
-    private static let maximumFollowAlongSteps = 8
+    private static var onboardingPromptMessage: String { "hold \(GlobalPushToTalkShortcutMonitor.shortcutDisplayText.lowercased()) and ask me anything" }
 
     /// Past exchanges replayed to Claude so it remembers the conversation.
-    private var conversationHistory: [ConversationTurn] = []
+    private var conversationMemory = ConversationMemory()
     private var currentReplyTask: Task<Void, Never>?
+    private var currentReplyIdentifier = UUID()
     private var pendingRecordingStartTask: Task<Void, Never>?
     private var onboardingPromptTask: Task<Void, Never>?
     /// Pointing targets waiting for their sentence to start playing, keyed by sentence ID.
     private var pointingTargetsBySentenceID: [UUID: PointingTarget] = [:]
     /// What the user originally asked for, kept while following along so each
     /// fresh screenshot can be judged against the real goal.
-    private var followAlongGoal: String?
-    private var followAlongStepCount = 0
+    private var followAlongSession = FollowAlongSession()
     /// Set once the current reply's first words arrive, so the slow-connection
     /// notice knows whether it's still needed.
     private var hasCurrentReplyStartedArriving = false
@@ -118,17 +92,7 @@ final class CompanionManager: ObservableObject {
     /// If no words have arrived after this long, Sage says it's still working.
     private static let slowConnectionNoticeDelaySeconds: Double = 6
     private var cancellables = Set<AnyCancellable>()
-
-    /// Everything gathered about the reply currently being streamed.
-    private struct ReplyInProgress {
-        let capturedScreens: [CapturedScreen]
-        var spokenText = ""
-        /// A tag Claude wrote whose sentence hasn't arrived yet.
-        var pointingTargetForNextSentence: PointingTarget?
-        var wasRefused = false
-        /// Claude ended with [FOLLOW]: it's waiting for the user to act.
-        var wantsToFollowAlong = false
-    }
+    private var hasStarted = false
 
     // MARK: - Lifecycle
 
@@ -144,6 +108,16 @@ final class CompanionManager: ObservableObject {
     }
 
     func start() {
+        guard !hasStarted else { return }
+        hasStarted = true
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.isOverlayVisible else { return }
+                self.currentPointingTarget = nil
+                self.showOverlay(isFirstAppearance: false)
+            }
+            .store(in: &cancellables)
         speechPlaybackQueue.onSegmentStartedPlaying = { [weak self] sentenceID in
             self?.handleSentenceStartedPlaying(sentenceID: sentenceID)
         }
@@ -160,19 +134,41 @@ final class CompanionManager: ObservableObject {
         bindShortcutTransitions()
         handlePermissionsChanged()
 
-        claudeClient.warmUpConnection()
+        apiClient.warmUpConnection()
     }
 
     func stop() {
+        hasStarted = false
+        pendingRecordingStartTask?.cancel()
+        pendingRecordingStartTask = nil
+        onboardingPromptTask?.cancel()
+        onboardingPromptTask = nil
+        cancellables.removeAll()
         stopFollowingAlong()
         shortcutMonitor.stop()
         dictationManager.cancel()
         interruptCurrentReply()
         overlayWindowManager.hideOverlay()
+        isOverlayVisible = false
+        voiceState = .idle
         permissions.stopMonitoring()
     }
 
     // MARK: - Settings
+
+    func accessCredentialsDidChange() {
+        stop()
+        conversationMemory = ConversationMemory()
+        start()
+    }
+
+    func selectShortcut(_ shortcut: PushToTalkShortcut) {
+        pendingRecordingStartTask?.cancel()
+        pendingRecordingStartTask = nil
+        dictationManager.cancel()
+        shortcutMonitor.selectShortcut(shortcut)
+        dismissOnboardingPrompt()
+    }
 
     func selectVoice(_ voiceOption: SageVoiceOption) {
         selectedVoice = voiceOption
@@ -192,6 +188,7 @@ final class CompanionManager: ObservableObject {
 
     /// The "Start" button: show the cursor for the first time and run the intro.
     func startOnboarding() {
+        guard permissions.allPermissionsGranted, AppConfiguration.isConfigured else { return }
         NotificationCenter.default.post(name: .sageDismissMenu, object: nil)
         hasCompletedOnboarding = true
         showOverlay(isFirstAppearance: true)
@@ -243,7 +240,7 @@ final class CompanionManager: ObservableObject {
         overlayWindowManager.showOverlay(
             onScreens: NSScreen.screens,
             isFirstAppearance: isFirstAppearance,
-            companionManager: self
+            sessionCoordinator: self
         )
         isOverlayVisible = true
     }
@@ -259,6 +256,16 @@ final class CompanionManager: ObservableObject {
     // MARK: - Permissions
 
     private func handlePermissionsChanged() {
+        if !permissions.allPermissionsGranted {
+            pendingRecordingStartTask?.cancel()
+            pendingRecordingStartTask = nil
+            dictationManager.cancel()
+            stopFollowingAlong()
+            interruptCurrentReply()
+            overlayWindowManager.hideOverlay()
+            isOverlayVisible = false
+            voiceState = .idle
+        }
         if permissions.hasAccessibilityPermission {
             shortcutMonitor.start()
         } else {
@@ -296,6 +303,10 @@ final class CompanionManager: ObservableObject {
     private func handleShortcutTransition(_ shortcutTransition: PushToTalkShortcutTransition) {
         switch shortcutTransition {
         case .pressed:
+            guard permissions.allPermissionsGranted, AppConfiguration.isConfigured else {
+                logger.notice("Shortcut ignored: setup or permissions are incomplete")
+                return
+            }
             guard isOverlayVisible else {
                 logger.notice("Shortcut ignored: the cursor overlay isn't showing yet")
                 return
@@ -366,8 +377,7 @@ final class CompanionManager: ObservableObject {
     /// A fresh spoken question. It also becomes the goal if Sage ends up
     /// guiding the user through several screens.
     private func startNewQuestion(_ questionText: String) {
-        followAlongGoal = questionText
-        followAlongStepCount = 0
+        followAlongSession.begin(goal: questionText)
         startReply(mode: .companion, userText: questionText)
     }
 
@@ -375,7 +385,7 @@ final class CompanionManager: ObservableObject {
     /// as Claude's [FOLLOW] tag arrives, so a quick click isn't missed even if
     /// Sage is still finishing its sentence.
     private func startFollowingAlong() {
-        guard followAlongGoal != nil, followAlongStepCount < Self.maximumFollowAlongSteps else {
+        guard followAlongSession.canContinue else {
             stopFollowingAlong()
             return
         }
@@ -400,8 +410,7 @@ final class CompanionManager: ObservableObject {
     private func stopFollowingAlong() {
         userActivityWatcher.stopWatching()
         isFollowingAlong = false
-        followAlongGoal = nil
-        followAlongStepCount = 0
+        followAlongSession.end()
     }
 
     /// The user clicked, typed, or scrolled and the screen has settled: take
@@ -420,15 +429,9 @@ final class CompanionManager: ObservableObject {
     }
 
     private func lookAgainAfterUserAction() {
-        guard let followAlongGoal else { return }
-        followAlongStepCount += 1
-        logger.notice("Following along: looking again (step \(self.followAlongStepCount, privacy: .public))")
+        guard let followUpText = followAlongSession.nextQuestion() else { return }
+        logger.notice("Following along: looking again (step \(self.followAlongSession.stepCount, privacy: .public))")
 
-        let followUpText = """
-        (i did that step. this screenshot is my screen right now. keep guiding me toward my goal: "\(followAlongGoal)". \
-        if my screen isn't what you expected, adjust from what you actually see. \
-        if the goal is done, say so in one short sentence and don't add [FOLLOW].)
-        """
         startReply(mode: .companion, userText: followUpText, isFollowAlongLook: true)
     }
 
@@ -442,13 +445,15 @@ final class CompanionManager: ObservableObject {
         isReplyInProgress = true
         voiceState = .processing
 
+        let replyIdentifier = currentReplyIdentifier
         currentReplyTask = Task { [weak self] in
-            await self?.runReply(mode: mode, userText: userText, isFollowAlongLook: isFollowAlongLook)
+            await self?.runReply(mode: mode, userText: userText, isFollowAlongLook: isFollowAlongLook, replyIdentifier: replyIdentifier)
         }
     }
 
     /// Stops whatever Sage is saying or about to say.
     private func interruptCurrentReply() {
+        currentReplyIdentifier = UUID()
         currentReplyTask?.cancel()
         currentReplyTask = nil
         slowConnectionNoticeTask?.cancel()
@@ -459,93 +464,53 @@ final class CompanionManager: ObservableObject {
         isReplyInProgress = false
     }
 
-    private func runReply(mode: ConversationMode, userText: String, isFollowAlongLook: Bool) async {
+    private func runReply(mode: ConversationMode, userText: String, isFollowAlongLook: Bool, replyIdentifier: UUID) async {
         hasCurrentReplyStartedArriving = false
         startSlowConnectionNotice()
         defer {
-            slowConnectionNoticeTask?.cancel()
-            slowConnectionNoticeTask = nil
+            if currentReplyIdentifier == replyIdentifier {
+                slowConnectionNoticeTask?.cancel()
+                slowConnectionNoticeTask = nil
+            }
         }
 
         do {
-            let allCapturedScreens = try await ScreenCaptureService.captureAllScreens()
-            let capturedScreens = isFollowAlongLook
-                ? Array(allCapturedScreens.filter { $0.isCursorScreen }.prefix(1)).ifEmpty(allCapturedScreens)
-                : allCapturedScreens
-            try Task.checkCancellation()
-
-            var replyInProgress = ReplyInProgress(capturedScreens: capturedScreens)
-            var responseSegmenter = StreamingResponseSegmenter()
-
-            // A server hiccup before any words arrive is retried once, quietly.
-            // Once Sage has started talking, a retry would repeat itself, so
-            // later failures are reported instead.
-            var hasReceivedAnyReplyText = false
-            for attemptNumber in 1...2 {
-                do {
-                    try await claudeClient.streamReply(
-                        mode: mode,
-                        conversationHistory: mode == .companion ? conversationHistory : [],
-                        capturedScreens: capturedScreens,
-                        userText: userText
-                    ) { streamEvent in
-                        switch streamEvent {
-                        case .textDelta(let newText):
-                            hasReceivedAnyReplyText = true
-                            hasCurrentReplyStartedArriving = true
-                            queueSegmentsForPlayback(responseSegmenter.append(newText), replyInProgress: &replyInProgress)
-                        case .refusal:
-                            replyInProgress.wasRefused = true
-                        }
-                    }
-                    break
-                } catch let claudeClientError as ClaudeClientError {
-                    let isServerError = (claudeClientError.httpStatusCode ?? 0) >= 500
-                    guard attemptNumber == 1, isServerError, !hasReceivedAnyReplyText else { throw claudeClientError }
-                    logger.notice("Server error before any reply text, retrying once: \(claudeClientError.message, privacy: .public)")
-                    try await Task.sleep(for: .milliseconds(600))
-                }
+            let result = try await replyExecutor.execute(
+                input: ReplyInput(mode: mode, userText: userText,
+                                  conversationHistory: mode == .companion ? conversationMemory.turns : [],
+                                  onlyCursorScreen: isFollowAlongLook)
+            ) { [weak self] event in
+                guard let self, !Task.isCancelled, self.currentReplyIdentifier == replyIdentifier else { return }
+                self.handleReplyExecutionEvent(event)
             }
             try Task.checkCancellation()
-
-            queueSegmentsForPlayback(responseSegmenter.finish(), replyInProgress: &replyInProgress)
-
-            // A tag at the very end with no sentence after it: point right away.
-            if let leftoverPointingTarget = replyInProgress.pointingTargetForNextSentence {
-                currentPointingTarget = leftoverPointingTarget
-            }
-
-            if replyInProgress.spokenText.isEmpty {
-                let emptyReplyMessage = replyInProgress.wasRefused
-                    ? "i can't help with that one, but ask me something else."
-                    : "hmm, i blanked on that. try asking again."
-                queueSegmentsForPlayback([.speech(emptyReplyMessage)], replyInProgress: &replyInProgress)
-            } else if mode == .companion {
-                rememberExchange(userText: userText, assistantText: replyInProgress.spokenText)
+            guard currentReplyIdentifier == replyIdentifier else { return }
+            if mode == .companion && result.hasAnswer {
+                conversationMemory.remember(userText: userText, assistantText: result.spokenText)
             }
 
             await speechPlaybackQueue.waitUntilFinishedPlaying()
 
-            if mode == .companion && !replyInProgress.wantsToFollowAlong {
+            if mode == .companion && !result.wantsToFollowAlong {
                 // Claude didn't ask the user to do anything, so the guided task is over.
                 stopFollowingAlong()
             }
         } catch {
-            guard !Task.isCancelled, !Self.isCancellation(error) else { return }
+            guard !Task.isCancelled, !ReplyFailureExplanation.isCancellation(error) else { return }
             stopFollowingAlong()
             print("⚠️ Reply failed: \(error)")
             logger.error("Reply failed: \(String(describing: error), privacy: .public)")
             // Always explain errors with the free Mac voice, so an ElevenLabs
             // problem can't hide the explanation.
             speechPlaybackQueue.enqueue(
-                text: Self.spokenExplanation(for: error),
+                text: ReplyFailureExplanation.spokenExplanation(for: error),
                 segmentID: UUID(),
                 voice: macVoice
             )
             await speechPlaybackQueue.waitUntilFinishedPlaying()
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, currentReplyIdentifier == replyIdentifier else { return }
         finishReply(mode: mode)
     }
 
@@ -559,27 +524,18 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// Speaks each finished sentence and lines pointing tags up with the
-    /// sentence that follows them.
-    private func queueSegmentsForPlayback(_ responseSegments: [ResponseSegment], replyInProgress: inout ReplyInProgress) {
-        for responseSegment in responseSegments {
-            switch responseSegment {
-            case .pointing(let pointingTag):
-                replyInProgress.pointingTargetForNextSentence = pointingTag.resolve(against: replyInProgress.capturedScreens)
-
-            case .speech(let sentence):
-                let sentenceID = UUID()
-                if let pointingTarget = replyInProgress.pointingTargetForNextSentence {
-                    pointingTargetsBySentenceID[sentenceID] = pointingTarget
-                    replyInProgress.pointingTargetForNextSentence = nil
-                }
-                replyInProgress.spokenText += replyInProgress.spokenText.isEmpty ? sentence : " " + sentence
-                speechPlaybackQueue.enqueue(text: sentence, segmentID: sentenceID, voice: activeVoice)
-
-            case .followAlong:
-                replyInProgress.wantsToFollowAlong = true
-                startFollowingAlong()
-            }
+    private func handleReplyExecutionEvent(_ event: ReplyExecutionEvent) {
+        switch event {
+        case .textReceived:
+            hasCurrentReplyStartedArriving = true
+        case .sentence(let text, let target):
+            let sentenceID = UUID()
+            if let target { pointingTargetsBySentenceID[sentenceID] = target }
+            speechPlaybackQueue.enqueue(text: text, segmentID: sentenceID, voice: activeVoice)
+        case .pointing(let target):
+            currentPointingTarget = target
+        case .followAlong:
+            startFollowingAlong()
         }
     }
 
@@ -592,13 +548,6 @@ final class CompanionManager: ObservableObject {
         }
         if let pointingTarget = pointingTargetsBySentenceID.removeValue(forKey: sentenceID) {
             currentPointingTarget = pointingTarget
-        }
-    }
-
-    private func rememberExchange(userText: String, assistantText: String) {
-        conversationHistory.append(ConversationTurn(userText: userText, assistantText: assistantText))
-        if conversationHistory.count > Self.maximumRememberedTurns {
-            conversationHistory.removeFirst(conversationHistory.count - Self.maximumRememberedTurns)
         }
     }
 
@@ -621,52 +570,5 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    // MARK: - Error Messages
 
-    private static func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError { return true }
-        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
-        return false
-    }
-
-    /// Turns an error into one short sentence Sage can say out loud.
-    private static func spokenExplanation(for error: Error) -> String {
-        if error is SageConfigurationError {
-            return "i'm not set up yet. add the worker address and app key to sage secrets, then restart me."
-        }
-        if error is ScreenCaptureFailure {
-            return "i couldn't see your screen. make sure screen recording is turned on for sage."
-        }
-        if let claudeClientError = error as? ClaudeClientError, let httpStatusCode = claudeClientError.httpStatusCode {
-            switch httpStatusCode {
-            case 401:
-                return "my app key doesn't match the server. check that it's the same in both places."
-            case 429:
-                return "i'm getting a lot of requests right now. give me a minute."
-            case 500...599:
-                return "my brain is having a moment on the server side. try again in a few seconds."
-            default:
-                break
-            }
-        }
-        if let urlError = error as? URLError {
-            switch urlError.code {
-            case .notConnectedToInternet, .dataNotAllowed:
-                return "looks like you're offline. check your wifi, then ask me again."
-            case .timedOut:
-                return "my connection timed out. your internet might be slow right now, try asking again."
-            default:
-                return "i can't reach my server. check your internet, or make sure the worker is running."
-            }
-        }
-        return "something went wrong on my end. try that again."
-    }
-}
-
-
-private extension Array {
-    /// Returns `fallback` when this array is empty.
-    func ifEmpty(_ fallback: [Element]) -> [Element] {
-        isEmpty ? fallback : self
-    }
 }

@@ -10,3 +10,8 @@ worker/.dev.vars
 worker/node_modules/
 worker/.wrangler/
 .claude/
+
+website/.wrangler/
+
+# Wrangler cache created when commands are launched from the repository root
+/.wrangler/

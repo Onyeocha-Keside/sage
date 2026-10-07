@@ -31,6 +31,7 @@ final class SpeechPlaybackQueue {
     private var queuedSentences: [QueuedSentence] = []
     private var playbackLoopTask: Task<Void, Never>?
     private var currentlyPlayingVoice: SpeechVoice?
+    private var playbackGeneration = UUID()
 
     init(fallbackVoice: SpeechVoice) {
         self.fallbackVoice = fallbackVoice
@@ -48,6 +49,7 @@ final class SpeechPlaybackQueue {
 
     /// Stops the current sentence and throws away everything queued.
     func stopAll() {
+        playbackGeneration = UUID()
         for queuedSentence in queuedSentences {
             queuedSentence.preparedSpeech.cancelPreparation()
         }
@@ -69,29 +71,32 @@ final class SpeechPlaybackQueue {
 
     private func startPlaybackLoopIfNeeded() {
         guard playbackLoopTask == nil else { return }
+        let generation = playbackGeneration
         playbackLoopTask = Task { [weak self] in
-            await self?.playQueuedSentencesUntilEmpty()
+            await self?.playQueuedSentencesUntilEmpty(generation: generation)
         }
     }
 
-    private func playQueuedSentencesUntilEmpty() async {
-        while !queuedSentences.isEmpty && !Task.isCancelled {
+    private func playQueuedSentencesUntilEmpty(generation: UUID) async {
+        while !queuedSentences.isEmpty && !Task.isCancelled && playbackGeneration == generation {
             let nextSentence = queuedSentences.removeFirst()
-            await play(nextSentence)
+            await play(nextSentence, generation: generation)
         }
 
         // A cancelled loop may already have been replaced by a newer one
         // (stopAll followed by enqueue), so only a loop that ran to the end
         // clears the handle.
-        if !Task.isCancelled {
+        if !Task.isCancelled && playbackGeneration == generation {
             playbackLoopTask = nil
         }
     }
 
-    private func play(_ queuedSentence: QueuedSentence) async {
+    private func play(_ queuedSentence: QueuedSentence, generation: UUID) async {
         let segmentID = queuedSentence.segmentID
         currentlyPlayingVoice = queuedSentence.voice
-        defer { currentlyPlayingVoice = nil }
+        defer {
+            if playbackGeneration == generation { currentlyPlayingVoice = nil }
+        }
 
         do {
             try await queuedSentence.voice.play(queuedSentence.preparedSpeech) {
@@ -101,7 +106,7 @@ final class SpeechPlaybackQueue {
             return
         } catch {
             print("⚠️ Speech failed, using the Mac voice for this sentence: \(error.localizedDescription)")
-            guard queuedSentence.voice !== fallbackVoice, !Task.isCancelled else { return }
+            guard queuedSentence.voice !== fallbackVoice, !Task.isCancelled, playbackGeneration == generation else { return }
 
             currentlyPlayingVoice = fallbackVoice
             let fallbackSpeech = fallbackVoice.prepare(queuedSentence.preparedSpeech.text)

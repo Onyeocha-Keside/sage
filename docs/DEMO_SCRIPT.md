@@ -13,7 +13,7 @@ Goal: a 45–60 second screen recording that makes people stop scrolling. Show, 
 
 **1. Hook (0–5s).** Open on a busy, intimidating app (Blender or Final Cut works well). Text overlay: *"I built an AI that can see my screen and point at things."*
 
-**2. The tour (5–20s).** Hold Control + Option: *"Give me a quick tour of this app."*
+**2. The tour (5–20s).** Hold Control + Shift: *"Give me a quick tour of this app."*
 The cursor hops from panel to panel as Sage explains each one. This is the money shot. Don't cut it.
 
 **3. Find the button (20–32s).** In Figma or Photoshop: *"How do I export this as a PNG?"*

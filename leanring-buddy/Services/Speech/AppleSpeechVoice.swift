@@ -38,13 +38,19 @@ final class AppleSpeechVoice: NSObject, SpeechVoice, AVSpeechSynthesizerDelegate
     }
 
     func play(_ preparedSpeech: PreparedSpeech, onPlaybackStarted: () -> Void) async throws {
+        try Task.checkCancellation()
         stopPlayback()
 
         let utterance = AVSpeechUtterance(string: preparedSpeech.text)
         utterance.voice = chosenSystemVoice
 
+        let utteranceIdentifier = ObjectIdentifier(utterance)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
                 playbackContinuation = continuation
                 currentUtteranceIdentifier = ObjectIdentifier(utterance)
                 speechSynthesizer.speak(utterance)
@@ -52,6 +58,7 @@ final class AppleSpeechVoice: NSObject, SpeechVoice, AVSpeechSynthesizerDelegate
             }
         } onCancel: {
             Task { @MainActor [weak self] in
+                guard self?.currentUtteranceIdentifier == utteranceIdentifier else { return }
                 self?.stopPlayback()
             }
         }

@@ -3,9 +3,16 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node scripts/test.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "esbuild": "0.28.1",
+    "typescript": "^7.0.2",
+    "wrangler": "4.147.0"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }

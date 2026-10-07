@@ -2,7 +2,7 @@
 //  GlobalPushToTalkShortcutMonitor.swift
 //  Sage
 //
-//  Watches for the push-to-talk shortcut (control + option) system-wide,
+//  Watches for the push-to-talk shortcut (configured modifiers) system-wide,
 //  even while another app is focused.
 //
 //  Two detectors feed the same pressed/released state:
@@ -31,11 +31,16 @@ enum PushToTalkShortcutTransition {
 @MainActor
 final class GlobalPushToTalkShortcutMonitor: ObservableObject {
     /// Shown in the UI wherever the shortcut is mentioned.
-    static let shortcutDisplayText = "Control + Option"
+    static var shortcutDisplayText: String { PushToTalkShortcut.selected.displayText }
 
-    /// Modifier-only so holding it never types a character into the focused app.
-    private static let shortcutEventTapFlags: CGEventFlags = [.maskControl, .maskAlternate]
-    private static let shortcutAppKitFlags: NSEvent.ModifierFlags = [.control, .option]
+    func selectShortcut(_ shortcut: PushToTalkShortcut) {
+        // Release an active recording before changing the combination.
+        if isShortcutCurrentlyPressed {
+            isShortcutCurrentlyPressed = false
+            shortcutTransitionPublisher.send(.released)
+        }
+        UserDefaults.standard.set(shortcut.rawValue, forKey: "pushToTalkShortcut")
+    }
 
     let shortcutTransitionPublisher = PassthroughSubject<PushToTalkShortcutTransition, Never>()
 
@@ -144,7 +149,7 @@ final class GlobalPushToTalkShortcutMonitor: ObservableObject {
         }
 
         if eventType == .flagsChanged {
-            updateShortcutState(isShortcutPressedNow: event.flags.contains(Self.shortcutEventTapFlags), detectorName: "event tap")
+            updateShortcutState(isShortcutPressedNow: PushToTalkShortcut.selected.matches(event.flags), detectorName: "event tap")
         }
 
         return Unmanaged.passUnretained(event)
@@ -156,11 +161,9 @@ final class GlobalPushToTalkShortcutMonitor: ObservableObject {
         if appKitGlobalFlagsMonitor == nil {
             // Sees modifier changes while other apps are focused.
             appKitGlobalFlagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] flagsChangedEvent in
-                let isShortcutPressedNow = flagsChangedEvent.modifierFlags
-                    .intersection(.deviceIndependentFlagsMask)
-                    .contains(Self.shortcutAppKitFlags)
+                let eventFlags = CGEventFlags(rawValue: UInt64(flagsChangedEvent.modifierFlags.rawValue))
                 Task { @MainActor [weak self] in
-                    self?.updateShortcutState(isShortcutPressedNow: isShortcutPressedNow, detectorName: "appkit global")
+                    self?.updateShortcutState(isShortcutPressedNow: PushToTalkShortcut.selected.matches(eventFlags), detectorName: "appkit global")
                 }
             }
         }
@@ -169,11 +172,9 @@ final class GlobalPushToTalkShortcutMonitor: ObservableObject {
             // Global monitors skip events sent to Sage itself (for example
             // while the menu bar panel is focused), so watch those too.
             appKitLocalFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] flagsChangedEvent in
-                let isShortcutPressedNow = flagsChangedEvent.modifierFlags
-                    .intersection(.deviceIndependentFlagsMask)
-                    .contains(Self.shortcutAppKitFlags)
+                let eventFlags = CGEventFlags(rawValue: UInt64(flagsChangedEvent.modifierFlags.rawValue))
                 Task { @MainActor [weak self] in
-                    self?.updateShortcutState(isShortcutPressedNow: isShortcutPressedNow, detectorName: "appkit local")
+                    self?.updateShortcutState(isShortcutPressedNow: PushToTalkShortcut.selected.matches(eventFlags), detectorName: "appkit local")
                 }
                 return flagsChangedEvent
             }

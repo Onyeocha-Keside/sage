@@ -1,5 +1,5 @@
 //
-//  ClaudeClient.swift
+//  SageAPIClient.swift
 //  Sage
 //
 //  Streams Claude's reply from the Sage Worker over Server-Sent Events.
@@ -11,37 +11,15 @@
 
 import Foundation
 
-/// Which system prompt the Worker should use.
-enum ConversationMode: String {
-    /// Normal push-to-talk conversation.
-    case companion
-    /// The first-run demo, where Sage points at something on screen to show off.
-    case onboarding
-}
-
-/// One earlier exchange, replayed as text so Claude remembers the conversation.
-struct ConversationTurn {
-    let userText: String
-    let assistantText: String
-}
-
-enum ClaudeStreamEvent {
-    /// More reply text arrived.
-    case textDelta(String)
-    /// Claude declined to answer (a safety classifier refusal).
-    case refusal
-}
-
-struct ClaudeClientError: LocalizedError {
-    /// HTTP status from the Worker, or nil when the failure came mid-stream.
-    let httpStatusCode: Int?
-    let message: String
-
-    var errorDescription: String? { message }
+@MainActor
+protocol ReplyStreamingClient {
+    func streamReply(mode: ConversationMode, conversationHistory: [ConversationTurn],
+                     capturedScreens: [CapturedScreen], userText: String,
+                     onEvent: (ClaudeStreamEvent) -> Void) async throws
 }
 
 @MainActor
-final class ClaudeClient {
+final class SageAPIClient: ReplyStreamingClient {
     private let urlSession: URLSession
 
     init() {
@@ -92,7 +70,7 @@ final class ClaudeClient {
         let (responseByteStream, response) = try await urlSession.bytes(for: chatRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw ClaudeClientError(httpStatusCode: nil, message: "The Worker sent back something that isn't HTTP.")
+            throw SageAPIError(httpStatusCode: nil, message: "The Worker sent back something that isn't HTTP.")
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
@@ -100,48 +78,25 @@ final class ClaudeClient {
             for try await errorBodyLine in responseByteStream.lines {
                 errorBodyLines.append(errorBodyLine)
             }
-            throw ClaudeClientError(
+            throw SageAPIError(
                 httpStatusCode: httpResponse.statusCode,
                 message: "Worker error \(httpResponse.statusCode): \(errorBodyLines.joined(separator: " "))"
             )
         }
 
-        // Each SSE event we care about is a line like: data: {"type": "...", ...}
+        guard httpResponse.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("text/event-stream") == true else {
+            throw SageAPIError(httpStatusCode: nil, message: "The Worker did not return a reply stream.")
+        }
+        var streamDecoder = ClaudeStreamDecoder()
         for try await streamLine in responseByteStream.lines {
             try Task.checkCancellation()
-
-            guard streamLine.hasPrefix("data: ") else { continue }
-            let eventJSONText = String(streamLine.dropFirst("data: ".count))
-
-            guard let eventJSONData = eventJSONText.data(using: .utf8),
-                  let streamEvent = try? JSONSerialization.jsonObject(with: eventJSONData) as? [String: Any],
-                  let streamEventType = streamEvent["type"] as? String else {
-                continue
+            for streamEvent in try streamDecoder.consume(line: streamLine) {
+                onEvent(streamEvent)
             }
-
-            switch streamEventType {
-            case "content_block_delta":
-                // Thinking blocks also stream deltas; only text deltas are spoken.
-                if let delta = streamEvent["delta"] as? [String: Any],
-                   delta["type"] as? String == "text_delta",
-                   let textChunk = delta["text"] as? String {
-                    onEvent(.textDelta(textChunk))
-                }
-            case "message_delta":
-                if let delta = streamEvent["delta"] as? [String: Any],
-                   delta["stop_reason"] as? String == "refusal" {
-                    onEvent(.refusal)
-                }
-            case "error":
-                let errorDetails = streamEvent["error"] as? [String: Any]
-                let errorMessage = errorDetails?["message"] as? String ?? "unknown stream error"
-                throw ClaudeClientError(httpStatusCode: nil, message: "Claude stream error: \(errorMessage)")
-            case "message_stop":
-                return
-            default:
-                continue
-            }
+            if streamDecoder.hasCompleted { return }
         }
+        try Task.checkCancellation()
+        try streamDecoder.finish()
     }
 
     /// Builds the Messages API conversation: past turns as plain text (no old

@@ -85,7 +85,8 @@ extension PointingTag {
     /// Returns nil if there are no screenshots to map against.
     func resolve(against capturedScreens: [CapturedScreen]) -> PointingTarget? {
         let targetScreen: CapturedScreen?
-        if let screenNumber, screenNumber >= 1, screenNumber <= capturedScreens.count {
+        if let screenNumber {
+            guard screenNumber >= 1, screenNumber <= capturedScreens.count else { return nil }
             targetScreen = capturedScreens[screenNumber - 1]
         } else {
             targetScreen = capturedScreens.first(where: { $0.isCursorScreen }) ?? capturedScreens.first
@@ -95,6 +96,8 @@ extension PointingTag {
         let screenshotWidth = CGFloat(targetScreen.screenshotWidthInPixels)
         let screenshotHeight = CGFloat(targetScreen.screenshotHeightInPixels)
         let displayFrame = targetScreen.displayFrame
+        guard screenshotWidth > 0, screenshotHeight > 0,
+              screenshotPixelCoordinate.x.isFinite, screenshotPixelCoordinate.y.isFinite else { return nil }
 
         // Claude sometimes overshoots the image edges slightly; keep it on screen.
         let clampedPixelX = max(0, min(screenshotPixelCoordinate.x, screenshotWidth))

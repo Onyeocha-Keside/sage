@@ -35,11 +35,11 @@ struct ListeningWaveformView: View {
             HStack(alignment: .center, spacing: 2) {
                 ForEach(barHeightProfile.indices, id: \.self) { barIndex in
                     RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                        .fill(DS.Colors.cursor)
+                        .fill(CursorAppearance.Colors.cursor)
                         .frame(width: 2, height: barHeight(barIndex: barIndex, timelineDate: timelineContext.date))
                 }
             }
-            .shadow(color: DS.Colors.cursor.opacity(0.6), radius: 6)
+            .shadow(color: CursorAppearance.Colors.cursor.opacity(0.6), radius: 6)
             .animation(.linear(duration: 0.08), value: audioPowerLevel)
         }
     }
@@ -62,12 +62,12 @@ struct ThinkingSpinnerView: View {
         Circle()
             .trim(from: 0.15, to: 0.85)
             .stroke(
-                AngularGradient(colors: [DS.Colors.cursor.opacity(0), DS.Colors.cursor], center: .center),
+                AngularGradient(colors: [CursorAppearance.Colors.cursor.opacity(0), CursorAppearance.Colors.cursor], center: .center),
                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
             )
             .frame(width: 14, height: 14)
             .rotationEffect(.degrees(isSpinning ? 360 : 0))
-            .shadow(color: DS.Colors.cursor.opacity(0.6), radius: 6)
+            .shadow(color: CursorAppearance.Colors.cursor.opacity(0.6), radius: 6)
             .onAppear {
                 withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
                     isSpinning = true
@@ -85,14 +85,14 @@ struct CursorSpeechBubble: View {
     var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(DS.Colors.textOnCursor)
+            .foregroundColor(CursorAppearance.Colors.textOnCursor)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(DS.Colors.cursor)
+                    .fill(CursorAppearance.Colors.cursor)
                     .shadow(
-                        color: DS.Colors.cursor.opacity(0.5 + extraGlowAmount),
+                        color: CursorAppearance.Colors.cursor.opacity(0.5 + extraGlowAmount),
                         radius: 6 + extraGlowAmount * 16
                     )
             )
@@ -107,7 +107,7 @@ struct FollowAlongPulseView: View {
 
     var body: some View {
         Circle()
-            .stroke(DS.Colors.cursor, lineWidth: 1.5)
+            .stroke(CursorAppearance.Colors.cursor, lineWidth: 1.5)
             .frame(width: 30, height: 30)
             .scaleEffect(isExpanded ? 1.6 : 0.6)
             .opacity(isExpanded ? 0 : 0.8)

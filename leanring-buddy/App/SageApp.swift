@@ -25,7 +25,7 @@ struct SageApp: App {
 
 @MainActor
 final class SageAppDelegate: NSObject, NSApplicationDelegate {
-    private let companionManager = CompanionManager()
+    private let sessionCoordinator = SageSessionCoordinator()
     private var menuBarController: MenuBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -34,18 +34,18 @@ final class SageAppDelegate: NSObject, NSApplicationDelegate {
 
         quitOlderCopiesOfSage()
 
-        menuBarController = MenuBarController(companionManager: companionManager)
-        companionManager.start()
+        menuBarController = MenuBarController(sessionCoordinator: sessionCoordinator)
+        sessionCoordinator.start()
 
         // Open the menu right away if there's setup left to do, so first-time
         // users immediately see what to grant instead of a silent menu bar icon.
-        if companionManager.needsSetup {
+        if sessionCoordinator.needsSetup {
             menuBarController?.showMenuOnLaunch()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        companionManager.stop()
+        sessionCoordinator.stop()
     }
 
     /// Two copies of Sage fight over the microphone and the hotkey (both end

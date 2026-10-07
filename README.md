@@ -1,6 +1,6 @@
 # Sage
 
-**An AI companion that lives next to your cursor.** Hold **Control + Option**, ask a question out loud, and Sage looks at your screen, talks you through the answer, and flies its cursor to each thing it mentions as it says it.
+**An AI companion that lives next to your cursor.** Hold **Control + Shift**, ask a question out loud, and Sage looks at your screen, talks you through the answer, and flies its cursor to each thing it mentions as it says it.
 
 - "What am I looking at?" → a guided tour, with the cursor hopping between parts of the app
 - "How do I export this?" → step-by-step help, pointing at each button
@@ -14,8 +14,8 @@ Built on macOS (SwiftUI + AppKit) with Claude for vision and reasoning.
 
 | Piece | Cost |
 | --- | --- |
-| Claude (Sonnet 5.5) | about **$0.01 per question**, from your Anthropic credits |
-| Speech-to-text | **free** (Apple, on-device) |
+| Claude (Sonnet 5.5) | varies with screenshots, tokens, and follow-along steps; measure actual usage |
+| Speech-to-text | **free** (Apple; on-device when supported) |
 | Voice | **free** Mac voice, or ElevenLabs (optional; its free tier covers a demo video) |
 | Server (Cloudflare Worker) | **free** tier |
 
@@ -38,7 +38,7 @@ Open `worker/.dev.vars` (git-ignored, never committed) and fill in your key:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
-SAGE_APP_KEY=<a long random string; generate with: openssl rand -hex 24>
+SAGE_ADMIN_KEY=<a separate long random secret; generate with: openssl rand -hex 32>
 # ELEVENLABS_API_KEY=...   (optional)
 ```
 
@@ -55,7 +55,7 @@ Check it at http://localhost:8787/health. It should say `"claudeConfigured": tru
 Copy `config/SageSecrets.example.plist` to `leanring-buddy/App/SageSecrets.plist` (git-ignored) and set:
 
 - `WorkerBaseURL`: `http://localhost:8787` for now
-- `AppKey`: the same value as `SAGE_APP_KEY`
+- Individual tokens are entered from **Sage → Enter Access Token…** and stored in Keychain. Follow [the access setup](docs/ACCESS_AND_BUDGETS.md) to issue your local token.
 
 ### 3. Build and run
 
@@ -65,7 +65,7 @@ open leanring-buddy.xcodeproj
 
 In Xcode: select the **leanring-buddy** scheme (the folder name is a legacy typo, the app is called Sage). Under *Signing & Capabilities*, pick your own Team (a free Apple ID works). Press **Cmd + R**.
 
-A leaf icon appears in the menu bar. Grant the permissions it asks for, hit **Start**, and Sage introduces itself.
+A leaf icon appears in the menu bar. Enter your individual access token, grant the permissions it asks for, hit **Start**, and Sage introduces itself.
 
 > **Tip:** the default Mac voices sound robotic. Download a Premium voice in System Settings → Accessibility → Spoken Content → System Voice → Manage Voices (for example "Zoe (Premium)"). Sage picks the best one installed automatically.
 
@@ -75,19 +75,19 @@ A leaf icon appears in the menu bar. Grant the permissions it asks for, hit **St
 cd worker
 npx wrangler login
 npx wrangler secret put ANTHROPIC_API_KEY
-npx wrangler secret put SAGE_APP_KEY
+npx wrangler secret put SAGE_ADMIN_KEY
 npx wrangler secret put ELEVENLABS_API_KEY   # optional
 npx wrangler deploy
 ```
 
-Put the `https://sage-api.<you>.workers.dev` URL into `SageSecrets.plist` and rebuild.
+Review [budget settings and the migration](docs/ACCESS_AND_BUDGETS.md) before deploying. Put the deployed Worker URL into `SageSecrets.plist`, rebuild in Xcode, and issue individual tokens against that Worker. Never distribute the admin key. Choose your saved shortcut from **Sage → Shortcut**.
 
 ---
 
 ## How it works
 
 ```
-hold Control+Option ──► mic → Apple Speech (on-device) ──► transcript
+hold Control+Shift ──► mic → Apple Speech (on-device) ──► transcript
                                                               │
 release ──► screenshot every display ──► Worker /chat ──► Claude (streaming)
                                                               │
@@ -106,7 +106,7 @@ The Worker holds the API keys, fixes the model and prompts, checks the app key, 
 ```
 leanring-buddy/                Mac app (folder name is legacy; the app is Sage)
   App/                         entry point, configuration
-  Companion/                   the conductor + reply parsing + permissions
+  Session/                   the conductor + reply parsing + permissions
   Services/                    Claude, screen capture, speech in/out, hotkey
   UI/                          menu bar panel, cursor overlay, design system
 leanring-buddyTests/           unit tests (Cmd + U)
@@ -119,3 +119,14 @@ See `AGENTS.md` for the full architecture notes.
 ## Credits
 
 Started from [Clicky](https://github.com/farzaa/clicky) by Farza (MIT license). See `LICENSE`.
+
+## Architecture and checks
+
+See [architecture and ownership](docs/ARCHITECTURE.md) and the [production review](docs/PRODUCTION_REVIEW.md).
+
+```bash
+# Worker: no provider calls or production storage writes in tests
+(cd worker && npm ci && npm run typecheck && npm test)
+# From the repository root: no app bundle or TCC changes
+bash scripts/check-swift.sh
+```

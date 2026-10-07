@@ -1,5 +1,5 @@
 //
-//  DesignSystem.swift
+//  CursorAppearance.swift
 //  Sage
 //
 //  Sage's colors. The menu bar menu is a native macOS menu and uses the
@@ -9,7 +9,7 @@
 
 import SwiftUI
 
-enum DS {
+enum CursorAppearance {
     enum Colors {
         /// Sage green, bright enough to stand out on both light and dark apps.
         static let cursor = Color(hex: "#3DDC97")

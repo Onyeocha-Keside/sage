@@ -3,6 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 [vars]
+# Conservative reservations, NOT measured provider charges. Calibrate before release.
+# USD expressed as integer millionths: 1,000,000 = $1.
+CHAT_RESERVATION_MICRO_USD = "1000000"
+TTS_RESERVATION_MICRO_USD = "100000"
+GLOBAL_DAILY_BUDGET_MICRO_USD = "10000000"
+GLOBAL_MONTHLY_BUDGET_MICRO_USD = "100000000"
 # Any voice from your ElevenLabs "Voices" page. Only used when the Mac app's
 # voice is set to ElevenLabs. Not a secret.
 ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
@@ -18,3 +24,11 @@ simple = { limit = 20, period = 60 }
 [[kv_namespaces]]
 binding = "WAITLIST"
 id = "97a6a008b7e745ef8490bc03f0f9a548"
+
+[[durable_objects.bindings]]
+name = "ACCESS_LEDGER"
+class_name = "AccessLedger"
+
+[[migrations]]
+tag = "v1-access-ledger"
+new_sqlite_classes = ["AccessLedger"]

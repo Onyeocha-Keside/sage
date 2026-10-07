@@ -39,7 +39,7 @@ enum ScreenCaptureService {
     /// Captures all displays, cursor screen first. Sage's own windows (the
     /// overlay and the menu bar panel) are excluded so Claude sees only the
     /// user's content.
-    static func captureAllScreens() async throws -> [CapturedScreen] {
+    static func captureScreens(onlyCursorScreen: Bool = false) async throws -> [CapturedScreen] {
         let shareableContent: SCShareableContent
         do {
             shareableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -73,15 +73,18 @@ enum ScreenCaptureService {
                           width: CGFloat(display.width), height: CGFloat(display.height))
         }
 
-        let displaysWithCursorScreenFirst = shareableContent.displays.sorted { firstDisplay, secondDisplay in
+        let orderedDisplays = shareableContent.displays.filter { nsScreenByDisplayID[$0.displayID] != nil }.sorted { firstDisplay, secondDisplay in
             let firstContainsCursor = appKitFrame(for: firstDisplay).contains(mouseLocation)
             let secondContainsCursor = appKitFrame(for: secondDisplay).contains(mouseLocation)
             return firstContainsCursor && !secondContainsCursor
         }
 
+        // Match the Worker image limit before doing expensive capture work.
+        let displaysWithCursorScreenFirst = Array(orderedDisplays.prefix(onlyCursorScreen ? 1 : 4))
         var capturedScreens: [CapturedScreen] = []
 
         for (displayIndex, display) in displaysWithCursorScreenFirst.enumerated() {
+            try Task.checkCancellation()
             let displayFrame = appKitFrame(for: display)
             let isCursorScreen = displayFrame.contains(mouseLocation)
 
@@ -89,10 +92,10 @@ enum ScreenCaptureService {
             let aspectRatio = CGFloat(display.width) / CGFloat(display.height)
             if display.width >= display.height {
                 streamConfiguration.width = maximumScreenshotDimension
-                streamConfiguration.height = Int(CGFloat(maximumScreenshotDimension) / aspectRatio)
+                streamConfiguration.height = max(1, Int(CGFloat(maximumScreenshotDimension) / aspectRatio))
             } else {
                 streamConfiguration.height = maximumScreenshotDimension
-                streamConfiguration.width = Int(CGFloat(maximumScreenshotDimension) * aspectRatio)
+                streamConfiguration.width = max(1, Int(CGFloat(maximumScreenshotDimension) * aspectRatio))
             }
 
             let screenshotImage: CGImage
@@ -107,7 +110,7 @@ enum ScreenCaptureService {
 
             guard let jpegData = NSBitmapImageRep(cgImage: screenshotImage)
                 .representation(using: .jpeg, properties: [.compressionFactor: jpegCompressionFactor]) else {
-                continue
+                throw ScreenCaptureFailure(underlyingDescription: "could not encode display screenshot")
             }
 
             let screenDescription: String

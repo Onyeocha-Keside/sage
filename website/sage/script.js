@@ -307,7 +307,7 @@ async function playFollowAlongDemo() {
   resetDemoScene();
   await sleep(900);
 
-  // 1. The user holds control + option and asks.
+  // 1. The user holds control + shift and asks.
   sageMenuIcon.classList.add("is-active");
   setSageMode("listening");
   setCaption("You", "“how do I export this as a PNG?”");

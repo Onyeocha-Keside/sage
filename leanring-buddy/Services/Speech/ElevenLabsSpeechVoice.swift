@@ -55,8 +55,13 @@ final class ElevenLabsSpeechVoice: NSObject, SpeechVoice, AVAudioPlayerDelegate 
         let newAudioPlayer = try AVAudioPlayer(data: audioData)
         newAudioPlayer.delegate = self
 
+        let playerIdentifier = ObjectIdentifier(newAudioPlayer)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
                 stopPlayback()
                 playbackContinuation = continuation
                 audioPlayer = newAudioPlayer
@@ -69,7 +74,9 @@ final class ElevenLabsSpeechVoice: NSObject, SpeechVoice, AVAudioPlayerDelegate 
             }
         } onCancel: {
             Task { @MainActor [weak self] in
-                self?.stopPlayback()
+                guard let self, let currentPlayer = self.audioPlayer,
+                      ObjectIdentifier(currentPlayer) == playerIdentifier else { return }
+                self.stopPlayback()
             }
         }
     }
