@@ -5,10 +5,13 @@ compatibility_date = "2026-09-01"
 [vars]
 # Conservative reservations, NOT measured provider charges. Calibrate before release.
 # USD expressed as integer millionths: 1,000,000 = $1.
-CHAT_RESERVATION_MICRO_USD = "1000000"
+# Chat reserves the code's $0.35 floor, though a typical question costs about
+# $0.01, so the caps below admit roughly 140 questions a day and 1,400 a month
+# (about $1.40 and $14 of real spend). Keep a provider-side spend limit too.
+CHAT_RESERVATION_MICRO_USD = "350000"
 TTS_RESERVATION_MICRO_USD = "100000"
-GLOBAL_DAILY_BUDGET_MICRO_USD = "10000000"
-GLOBAL_MONTHLY_BUDGET_MICRO_USD = "100000000"
+GLOBAL_DAILY_BUDGET_MICRO_USD = "50000000"
+GLOBAL_MONTHLY_BUDGET_MICRO_USD = "500000000"
 # Any voice from your ElevenLabs "Voices" page. Only used when the Mac app's
 # voice is set to ElevenLabs. Not a secret.
 ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"

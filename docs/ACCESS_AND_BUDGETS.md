@@ -1,6 +1,6 @@
 # Individual beta access and budget controls
 
-Implemented locally on 7 October 2026. This is invite-only access, not a full login, subscription billing, or enterprise account system. No production deployment or token issuance has been performed.
+Implemented and deployed to production on 7 October 2026 (Worker version 72fe2eca). This is invite-only access, not a full login, subscription billing, or enterprise account system. One founder account (`kc`, $300 monthly reservation allowance) has been issued. The production admin key is stored in the operator's macOS Keychain (service `sage-admin-key`, account `sage-api`).
 
 ## What changed
 
@@ -12,14 +12,14 @@ Each account allows 20 authenticated requests per UTC minute, alongside the exis
 
 ## Budget policy
 
-Amounts are integer millionths of USD: `1000000` represents $1. These are **conservative reservations, not measured provider charges or customer prices**. The checked-in beta settings are:
+Amounts are integer millionths of USD: `1000000` represents $1. These are **conservative reservations, not measured provider charges or customer prices**. A typical question really costs about $0.01, so each chat reservation over-counts roughly 35×. The deployed beta settings are:
 
 | Setting | Value | Meaning |
 |---|---:|---|
-| `CHAT_RESERVATION_MICRO_USD` | 1000000 | Reserve $1 before each paid chat attempt |
+| `CHAT_RESERVATION_MICRO_USD` | 350000 | Reserve $0.35 (the floor) before each paid chat attempt |
 | `TTS_RESERVATION_MICRO_USD` | 100000 | Reserve $0.10 before each voice request |
-| `GLOBAL_DAILY_BUDGET_MICRO_USD` | 10000000 | Stop admitting paid calls after $10 reserved per UTC day |
-| `GLOBAL_MONTHLY_BUDGET_MICRO_USD` | 100000000 | Stop admitting paid calls after $100 reserved per UTC month |
+| `GLOBAL_DAILY_BUDGET_MICRO_USD` | 50000000 | Stop admitting paid calls after $50 reserved per UTC day (about 140 questions) |
+| `GLOBAL_MONTHLY_BUDGET_MICRO_USD` | 500000000 | Stop admitting paid calls after $500 reserved per UTC month (about 1,400 questions) |
 
 Before chat inference, the Worker calls the [free token-counting endpoint](https://platform.claude.com/docs/en/build-with-claude/token-counting) with the same model, system prompt, and conversation, including images. It rejects counts above 100,000 and fails closed if counting is unavailable or malformed. Counting adds a network round trip and counts are estimates. Output remains capped at 2,048 tokens (512 for onboarding).
 
@@ -49,11 +49,11 @@ Missing/unavailable storage or policy blocks paid calls. Monthly allowance exhau
 
 Admin endpoints are `POST /admin/accounts/provision` with `{ accountID, monthlyLimitMicroUSD }` and `POST /admin/accounts/revoke` with `{ accountID }`. They require a separate `x-sage-admin-key` and the IP rate limiter. Tokens are returned with `Cache-Control: no-store`. There is no public issuance endpoint.
 
-## Production activation — still required
+## Production activation
 
-Review the conservative limits and actual provider pricing first. Configure the `SAGE_ADMIN_KEY` Cloudflare secret, deploy the Worker with its Durable Object migration, then issue individual tokens. Set `SAGE_WORKER_URL` in the admin script's environment to the deployed HTTPS URL. Deliver tokens securely to intended beta users; do not place them in a distributed plist, website, repository, or shared build.
+Done on 7 October 2026: limits calibrated, `SAGE_ADMIN_KEY` set, Worker deployed with its Durable Object migration, founder token issued. To issue more tokens, read the admin key from Keychain into the environment (never the command line): `SAGE_ADMIN_KEY="$(security find-generic-password -s sage-admin-key -a sage-api -w)" SAGE_WORKER_URL=https://sage-api.sage-api.workers.dev node scripts/manage-access.mjs provision ACCOUNT_ID 10000000`. Set `SAGE_WORKER_URL` in the admin script's environment to the deployed HTTPS URL. Deliver tokens securely to intended beta users; do not place them in a distributed plist, website, repository, or shared build.
 
-Deploy the client and server migration together: the updated app requires bearer tokens and an old Worker expects the retired shared-key header. No compatibility bypass is included. Existing developers also need a new individual token. Neither production configuration nor deployment was performed by this code change.
+Deploy the client and server migration together: the updated app requires bearer tokens and an old Worker expects the retired shared-key header. No compatibility bypass is included. Existing developers also need a new individual token. The retired `SAGE_APP_KEY` secret is still stored on the Worker but unused; it can be deleted with `npx wrangler secret delete SAGE_APP_KEY`.
 
 ## Shortcut and execution structure
 
