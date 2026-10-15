@@ -47,7 +47,7 @@ export async function handleChat(request: Request, env: Env): Promise<Response> 
 
   };
 
-  const inputFailure = await checkInputTokenLimit(request, env, anthropicRequestBody);
+  const inputFailure = checkInputTokenLimit(anthropicRequestBody);
   if (inputFailure) return inputFailure;
 
   let budgetFailureResponse: Response | null = null;

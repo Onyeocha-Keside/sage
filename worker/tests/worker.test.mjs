@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { worker, readJsonObject, validateMessages, sanitizeMessages, withConversationHistoryCached, AccessLedger, tokenHash } from "../.wrangler/tests/entry.mjs";
+import { worker, readJsonObject, validateMessages, sanitizeMessages, withConversationHistoryCached, AccessLedger, tokenHash, readImageDimensions, maximumImageTokens } from "../.wrangler/tests/entry.mjs";
 
 const environment = { SAGE_ADMIN_KEY: "test-only-admin", CHAT_RESERVATION_MICRO_USD: "1000000", TTS_RESERVATION_MICRO_USD: "100000", GLOBAL_MONTHLY_BUDGET_MICRO_USD: "100000000", GLOBAL_DAILY_BUDGET_MICRO_USD: "10000000", ACCESS_LEDGER: { idFromName(name) { return name; }, get() { return { async fetch(request) { const body = await request.json(); if (body.tokenHash !== await tokenHash("sage_" + "a".repeat(64))) return new Response("", { status: 401 }); return new Response("{}", { status: 200 }); } }; } }, ANTHROPIC_API_KEY: "test-only-provider", ELEVENLABS_API_KEY: "test-only-voice", ELEVENLABS_VOICE_ID: "test-voice", RATE_LIMITER: { async limit() { return { success: true }; } }, WAITLIST: { async get() { return null; }, async put() {} } };
 function request(path, body, headers = {}) {
@@ -63,7 +63,7 @@ test("provider options are stripped and history caching does not mutate input", 
 test("chat forwards the normalized request and streams the response", async () => {
   const originalFetch = globalThis.fetch;
   let upstreamPayload;
-  globalThis.fetch = async (url, options) => { if (url.endsWith("/count_tokens")) return Response.json({ input_tokens: 100 }); upstreamPayload = JSON.parse(options.body); return new Response('data: {"type":"message_stop"}\n\n', { headers: { "content-type": "text/event-stream" } }); };
+  globalThis.fetch = async (url, options) => { upstreamPayload = JSON.parse(options.body); return new Response('data: {"type":"message_stop"}\n\n', { headers: { "content-type": "text/event-stream" } }); };
   try {
     const response = await worker.fetch(request("/chat", { messages: [{ role: "user", content: "hello" }] }), environment);
     assert.equal(response.status, 200);
@@ -163,7 +163,7 @@ test("admin provisioning requires separate credentials and issued tokens are ret
 test("denied budgets prevent any paid provider request, including TTS", async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = async (url) => { if (url.endsWith("/count_tokens")) return Response.json({ input_tokens: 100 }); calls += 1; throw new Error("must not call paid provider"); };
+  globalThis.fetch = async (url) => { calls += 1; throw new Error("must not call paid provider"); };
   const denied = { ...environment, ACCESS_LEDGER: { idFromName() { return "global"; }, get() { return { async fetch(request) { return new URL(request.url).pathname === "/reserve" ? new Response("", { status: 429 }) : new Response("{}"); } }; } } };
   try {
     assert.equal((await worker.fetch(request("/chat", { messages: [{ role: "user", content: "hello" }] }), denied)).status, 429);
@@ -172,21 +172,35 @@ test("denied budgets prevent any paid provider request, including TTS", async ()
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("token preflight rejects oversized or uncountable inputs before paid inference", async () => {
+test("local input bound rejects oversized or unmeasurable inputs before paid inference", async () => {
   const originalFetch = globalThis.fetch;
   let paidCalls = 0;
+  globalThis.fetch = async () => { paidCalls += 1; return new Response("unexpected"); };
+  const unreadableImage = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } };
   try {
-    for (const count of [100001, null, -1, 1.5]) {
-      globalThis.fetch = async url => {
-        if (url.endsWith("/count_tokens")) return Response.json({ input_tokens: count });
-        paidCalls += 1;
-        return new Response("unexpected");
-      };
-      const response = await worker.fetch(request("/chat", { messages: [{ role: "user", content: "hello" }] }), environment);
-      assert.equal(response.status, count === 100001 ? 413 : 503);
-    }
+    const oversized = await worker.fetch(request("/chat", { messages: [{ role: "user", content: "a".repeat(100_001) }] }), environment);
+    assert.equal(oversized.status, 413);
+    const unmeasurable = await worker.fetch(request("/chat", { messages: [{ role: "user", content: [unreadableImage, { type: "text", text: "hi" }] }] }), environment);
+    assert.equal(unmeasurable.status, 400);
     assert.equal(paidCalls, 0);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("image dimensions are read from PNG and JPEG headers and bounded above Anthropic's formulas", () => {
+  const png = new Uint8Array(24);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  new DataView(png.buffer).setUint32(16, 1280);
+  new DataView(png.buffer).setUint32(20, 800);
+  const toBase64 = bytes => btoa(String.fromCharCode(...bytes));
+  assert.deepEqual(readImageDimensions(toBase64(png)), { width: 1280, height: 800 });
+  // SOI, an APP0 segment, then a baseline start-of-frame with height 720 and width 1280.
+  const jpeg = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x02, 0xd0, 0x05, 0x00, 0x03, 0, 0, 0, 0];
+  assert.deepEqual(readImageDimensions(toBase64(jpeg)), { width: 1280, height: 720 });
+  assert.equal(readImageDimensions("AAAA"), null);
+  assert.ok(maximumImageTokens(1280, 800) >= Math.ceil(1280 * 800 / 750));
+  assert.ok(maximumImageTokens(1280, 800) >= Math.ceil(1280 / 28) * Math.ceil(800 / 28));
+  // Sage's worst case (four 1280px screens plus a long conversation) stays well inside the limit.
+  assert.ok(4 * maximumImageTokens(1280, 1280) < 20_000);
 });
 
 test("each transport retry reserves again and no provider fallback is requested", async () => {
@@ -195,7 +209,6 @@ test("each transport retry reserves again and no provider fallback is requested"
   let paidCalls = 0;
   const retryEnvironment = { ...environment, ACCESS_LEDGER: { idFromName() { return "global"; }, get() { return { async fetch(request) { if (new URL(request.url).pathname === "/reserve") reservations += 1; return new Response("{}"); } }; } } };
   globalThis.fetch = async (url, options) => {
-    if (url.endsWith("/count_tokens")) return Response.json({ input_tokens: 100 });
     const payload = JSON.parse(options.body);
     assert.equal(payload.fallbacks, undefined);
     paidCalls += 1;

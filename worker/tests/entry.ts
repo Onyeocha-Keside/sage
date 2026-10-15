@@ -4,3 +4,4 @@ export { validateMessages, sanitizeMessages, withConversationHistoryCached } fro
 
 export { AccessLedger } from "../src/access/access-ledger";
 export { tokenHash } from "../src/access/access-policy";
+export { readImageDimensions, maximumImageTokens } from "../src/chat/input-token-limit";
