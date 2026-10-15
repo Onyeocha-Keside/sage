@@ -66,10 +66,6 @@ enum AppleSpeechTranscriber {
 /// One push-to-talk recording: audio goes in while the shortcut is held,
 /// and the final transcript comes out after release.
 final class SpeechTranscriptionSession: NSObject {
-    /// If Apple never sends a "final" result, Sage uses the latest partial
-    /// transcript after this long.
-    let finalTranscriptFallbackDelaySeconds: TimeInterval = 1.8
-
     private let recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
     private var recognitionTask: SFSpeechRecognitionTask?
     private let onTranscriptUpdate: (String) -> Void

@@ -7,6 +7,7 @@
 //  cursor overlay.
 //
 
+import AppKit
 import SwiftUI
 
 enum CursorAppearance {
@@ -15,6 +16,87 @@ enum CursorAppearance {
         static let cursor = Color(hex: "#3DDC97")
         /// Dark text that stays readable on top of the green cursor bubble.
         static let textOnCursor = Color(hex: "#06281A")
+    }
+}
+
+/// The cursor colors offered in the menu. `invisible` hides the overlay
+/// entirely: Sage still listens and talks, but nothing is drawn on screen.
+enum CursorColorOption: String, CaseIterable, Identifiable {
+    case sage
+    case blue
+    case purple
+    case pink
+    case orange
+    case invisible
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .sage: return "Sage Green"
+        case .blue: return "Blue"
+        case .purple: return "Purple"
+        case .pink: return "Pink"
+        case .orange: return "Orange"
+        case .invisible: return "Invisible (Voice Only)"
+        }
+    }
+
+    var isInvisible: Bool { self == .invisible }
+
+    /// Hex values for the cursor and for text on top of it, picked so labels
+    /// stay readable: dark text on light colors, white text on deep ones.
+    private var cursorHex: String {
+        switch self {
+        case .sage, .invisible: return "#3DDC97"
+        case .blue: return "#3B9EFF"
+        case .purple: return "#A57CFF"
+        case .pink: return "#FF6FB5"
+        case .orange: return "#FF9F40"
+        }
+    }
+
+    private var textHex: String {
+        switch self {
+        case .sage, .invisible: return "#06281A"
+        case .blue, .purple: return "#FFFFFF"
+        case .pink: return "#3A0A22"
+        case .orange: return "#2E1600"
+        }
+    }
+
+    var cursorColor: Color { Color(hex: cursorHex) }
+    var textColor: Color { Color(hex: textHex) }
+
+    /// The same color for AppKit, used for the swatch in the menu.
+    var menuSwatchColor: NSColor {
+        let rgbValue = UInt64(cursorHex.dropFirst(), radix: 16) ?? 0
+        return NSColor(srgbRed: CGFloat((rgbValue & 0xFF0000) >> 16) / 255,
+                       green: CGFloat((rgbValue & 0x00FF00) >> 8) / 255,
+                       blue: CGFloat(rgbValue & 0x0000FF) / 255,
+                       alpha: 1)
+    }
+}
+
+/// The chosen colors travel through the SwiftUI environment, so every piece
+/// of the overlay (triangle, waveform, spinner, bubbles) recolors at once.
+private struct CursorColorEnvironmentKey: EnvironmentKey {
+    static let defaultValue = CursorAppearance.Colors.cursor
+}
+
+private struct CursorTextColorEnvironmentKey: EnvironmentKey {
+    static let defaultValue = CursorAppearance.Colors.textOnCursor
+}
+
+extension EnvironmentValues {
+    var sageCursorColor: Color {
+        get { self[CursorColorEnvironmentKey.self] }
+        set { self[CursorColorEnvironmentKey.self] = newValue }
+    }
+
+    var sageCursorTextColor: Color {
+        get { self[CursorTextColorEnvironmentKey.self] }
+        set { self[CursorTextColorEnvironmentKey.self] = newValue }
     }
 }
 

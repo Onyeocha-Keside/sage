@@ -23,6 +23,9 @@ swiftc -swift-version 5 -default-isolation MainActor -enable-upcoming-feature Me
   leanring-buddy/Session/Reply/ReplyExecutor.swift \
   leanring-buddy/Services/ScreenCapture/ScreenCaptureService.swift \
   leanring-buddy/Session/Reply/PointingTag.swift \
+  leanring-buddy/Session/Pointing/PointingTargetGeometry.swift \
+  leanring-buddy/Services/ScreenCapture/ScreenSettleTracker.swift \
+  leanring-buddy/Services/Input/CircleGestureDetector.swift \
   leanring-buddy/Session/Reply/StreamingResponseSegmenter.swift \
   leanring-buddy/Services/Speech/SpeechVoice.swift \
   leanring-buddy/Services/Speech/SpeechPlaybackQueue.swift \

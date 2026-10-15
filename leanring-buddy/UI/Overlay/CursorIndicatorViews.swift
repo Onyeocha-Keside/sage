@@ -27,6 +27,7 @@ struct CursorTriangle: Shape {
 /// Five bars that bounce with your voice while you hold the shortcut.
 struct ListeningWaveformView: View {
     let audioPowerLevel: CGFloat
+    @Environment(\.sageCursorColor) private var cursorColor
 
     private let barHeightProfile: [CGFloat] = [0.4, 0.7, 1.0, 0.7, 0.4]
 
@@ -35,11 +36,11 @@ struct ListeningWaveformView: View {
             HStack(alignment: .center, spacing: 2) {
                 ForEach(barHeightProfile.indices, id: \.self) { barIndex in
                     RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                        .fill(CursorAppearance.Colors.cursor)
+                        .fill(cursorColor)
                         .frame(width: 2, height: barHeight(barIndex: barIndex, timelineDate: timelineContext.date))
                 }
             }
-            .shadow(color: CursorAppearance.Colors.cursor.opacity(0.6), radius: 6)
+            .shadow(color: cursorColor.opacity(0.6), radius: 6)
             .animation(.linear(duration: 0.08), value: audioPowerLevel)
         }
     }
@@ -57,17 +58,18 @@ struct ListeningWaveformView: View {
 /// A spinning arc shown while Sage is transcribing, looking, and thinking.
 struct ThinkingSpinnerView: View {
     @State private var isSpinning = false
+    @Environment(\.sageCursorColor) private var cursorColor
 
     var body: some View {
         Circle()
             .trim(from: 0.15, to: 0.85)
             .stroke(
-                AngularGradient(colors: [CursorAppearance.Colors.cursor.opacity(0), CursorAppearance.Colors.cursor], center: .center),
+                AngularGradient(colors: [cursorColor.opacity(0), cursorColor], center: .center),
                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
             )
             .frame(width: 14, height: 14)
             .rotationEffect(.degrees(isSpinning ? 360 : 0))
-            .shadow(color: CursorAppearance.Colors.cursor.opacity(0.6), radius: 6)
+            .shadow(color: cursorColor.opacity(0.6), radius: 6)
             .onAppear {
                 withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
                     isSpinning = true
@@ -81,18 +83,20 @@ struct CursorSpeechBubble: View {
     let text: String
     /// Extra glow while the bubble is popping in (0 = settled).
     var extraGlowAmount: CGFloat = 0
+    @Environment(\.sageCursorColor) private var cursorColor
+    @Environment(\.sageCursorTextColor) private var textColor
 
     var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(CursorAppearance.Colors.textOnCursor)
+            .foregroundColor(textColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(CursorAppearance.Colors.cursor)
+                    .fill(cursorColor)
                     .shadow(
-                        color: CursorAppearance.Colors.cursor.opacity(0.5 + extraGlowAmount),
+                        color: cursorColor.opacity(0.5 + extraGlowAmount),
                         radius: 6 + extraGlowAmount * 16
                     )
             )
@@ -104,10 +108,11 @@ struct CursorSpeechBubble: View {
 /// is in follow-along mode, as a quiet "go ahead, I'm watching" signal.
 struct FollowAlongPulseView: View {
     @State private var isExpanded = false
+    @Environment(\.sageCursorColor) private var cursorColor
 
     var body: some View {
         Circle()
-            .stroke(CursorAppearance.Colors.cursor, lineWidth: 1.5)
+            .stroke(cursorColor, lineWidth: 1.5)
             .frame(width: 30, height: 30)
             .scaleEffect(isExpanded ? 1.6 : 0.6)
             .opacity(isExpanded ? 0 : 0.8)
@@ -116,5 +121,32 @@ struct FollowAlongPulseView: View {
                     isExpanded = true
                 }
             }
+    }
+}
+
+/// A clean ring around what the user circled. It strokes itself in, like a
+/// pen finishing the circle, then stays until Sage has answered.
+struct CircledAreaRing: View {
+    /// In this overlay's view coordinates.
+    let ringRect: CGRect
+    @Environment(\.sageCursorColor) private var cursorColor
+    @State private var drawProgress: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .fill(cursorColor.opacity(0.08 * drawProgress))
+            Ellipse()
+                .trim(from: 0, to: drawProgress)
+                .stroke(cursorColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .shadow(color: cursorColor.opacity(0.7), radius: 6)
+        }
+        .frame(width: ringRect.width, height: ringRect.height)
+        .position(x: ringRect.midX, y: ringRect.midY)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.35)) {
+                drawProgress = 1
+            }
+        }
     }
 }

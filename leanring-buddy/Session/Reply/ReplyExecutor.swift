@@ -5,13 +5,18 @@ struct ReplyInput {
     let userText: String
     let conversationHistory: [ConversationTurn]
     let onlyCursorScreen: Bool
+    /// A capture already started by the caller (at key release, while the
+    /// transcript was still finishing). Used instead of capturing again.
+    var prefetchedScreens: Task<[CapturedScreen], Error>? = nil
 }
 
 enum ReplyExecutionEvent {
+    case screensCaptured([CapturedScreen])
     case textReceived
     case sentence(text: String, target: PointingTarget?)
     case pointing(PointingTarget)
     case followAlong
+    case nextStepHint(String)
 }
 
 struct ReplyResult {
@@ -37,8 +42,18 @@ final class ReplyExecutor {
     }
 
     func execute(input: ReplyInput, onEvent: (ReplyExecutionEvent) -> Void) async throws -> ReplyResult {
-        let screens = try await captureScreens(input.onlyCursorScreen)
+        let screens: [CapturedScreen]
+        if let prefetchedScreens = input.prefetchedScreens {
+            screens = try await withTaskCancellationHandler {
+                try await prefetchedScreens.value
+            } onCancel: {
+                prefetchedScreens.cancel()
+            }
+        } else {
+            screens = try await captureScreens(input.onlyCursorScreen)
+        }
         try Task.checkCancellation()
+        onEvent(.screensCaptured(screens))
         var assembly = ReplyAssembly(capturedScreens: screens)
         var segmenter = StreamingResponseSegmenter()
         var receivedText = false
@@ -89,6 +104,8 @@ final class ReplyExecutor {
             case .followAlong:
                 assembly.wantsToFollowAlong = true
                 onEvent(.followAlong)
+            case .nextStepHint(let hintText):
+                onEvent(.nextStepHint(hintText))
             }
         }
     }

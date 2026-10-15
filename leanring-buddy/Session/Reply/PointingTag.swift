@@ -78,12 +78,27 @@ struct PointingTarget: Equatable, Identifiable {
     /// Frame of the display the target is on, used to pick which overlay animates.
     let displayFrame: CGRect
     let label: String?
+    /// When the screenshot this target came from was taken (seconds since
+    /// boot), so scrolling after that moment can be accounted for.
+    var screenshotCaptureUptime: TimeInterval = 0
+    /// Set when the target has scrolled out of view: the location is then a
+    /// stand-in just inside the visible edge, and the bubble says which way to scroll.
+    var offScreenEdge: OffScreenEdge? = nil
+
+    /// The same target (same ID, so the cursor follows instead of re-flying)
+    /// at a new place.
+    func moved(to newLocation: CGPoint, offScreenEdge newOffScreenEdge: OffScreenEdge?) -> PointingTarget {
+        PointingTarget(id: id, globalScreenLocation: newLocation, displayFrame: displayFrame, label: label,
+                       screenshotCaptureUptime: screenshotCaptureUptime, offScreenEdge: newOffScreenEdge)
+    }
 }
 
 extension PointingTag {
     /// Maps this tag's screenshot pixels onto the screen it refers to.
     /// Returns nil if there are no screenshots to map against.
-    func resolve(against capturedScreens: [CapturedScreen]) -> PointingTarget? {
+    func resolve(against allCapturedImages: [CapturedScreen]) -> PointingTarget? {
+        // A circled-area close-up isn't a screen, so it never takes a screen number.
+        let capturedScreens = allCapturedImages.filter { !$0.isZoomedDetail }
         let targetScreen: CapturedScreen?
         if let screenNumber {
             guard screenNumber >= 1, screenNumber <= capturedScreens.count else { return nil }
@@ -117,7 +132,8 @@ extension PointingTag {
             id: UUID(),
             globalScreenLocation: globalScreenLocation,
             displayFrame: displayFrame,
-            label: label
+            label: label,
+            screenshotCaptureUptime: targetScreen.captureUptime
         )
     }
 }

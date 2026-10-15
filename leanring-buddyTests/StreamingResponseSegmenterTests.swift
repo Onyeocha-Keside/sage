@@ -87,5 +87,43 @@ struct StreamingResponseSegmenterTests {
             .speech("key.")
         ])
     }
-}
 
+    @Test func speaksTheOpeningClauseEarly() {
+        var responseSegmenter = StreamingResponseSegmenter()
+        #expect(responseSegmenter.append("sure, it's the blue") == [.speech("sure,")])
+        #expect(responseSegmenter.append(" button, top right. then, hit save.") == [.speech("it's the blue button, top right.")])
+        #expect(responseSegmenter.finish() == [.speech("then, hit save.")])
+    }
+
+    @Test func opensWithAClauseBeforeAPointingTag() {
+        let collectedSegments = segments(fromStreamedText: "okay, [POINT:42,12:file menu] open the file menu.")
+        #expect(collectedSegments == [
+            .speech("okay,"),
+            .pointing(PointingTag(screenshotPixelCoordinate: CGPoint(x: 42, y: 12), label: "file menu", screenNumber: nil)),
+            .speech("open the file menu.")
+        ])
+    }
+
+    @Test func keepsNumbersAndTinyOpenersWhole() {
+        #expect(segments(fromStreamedText: "about 1,000 rows at 10:30 today.") == [.speech("about 1,000 rows at 10:30 today.")])
+        var responseSegmenter = StreamingResponseSegmenter()
+        #expect(responseSegmenter.append("so, the") == [])
+    }
+
+    @Test func readsTheNextStepHintWithoutSpeakingIt() {
+        let collectedSegments = segments(fromStreamedText: "[POINT:420,64:search bar] type ecr up here. [FOLLOW] [NEXT:Elastic Container Registry]")
+        #expect(collectedSegments == [
+            .pointing(PointingTag(screenshotPixelCoordinate: CGPoint(x: 420, y: 64), label: "search bar", screenNumber: nil)),
+            .speech("type ecr up here."),
+            .followAlong,
+            .nextStepHint("Elastic Container Registry")
+        ])
+    }
+
+    @Test func neverSpeaksAHalfWrittenOrEmptyHint() {
+        var responseSegmenter = StreamingResponseSegmenter()
+        #expect(responseSegmenter.append("click it. [FOLLOW] [NEX") == [.speech("click it."), .followAlong])
+        #expect(responseSegmenter.finish() == [])
+        #expect(segments(fromStreamedText: "done. [NEXT: ]") == [.speech("done.")])
+    }
+}

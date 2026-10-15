@@ -37,13 +37,18 @@ enum ScreenChangeDetector {
     private static let thumbnailWidth = 96
 
     /// Below this average difference two thumbnails count as "the same".
-    /// High enough to ignore a blinking text cursor or a ticking clock,
-    /// low enough to notice a menu opening or a page swapping in.
-    static let unchangedDifferenceThreshold = 1.5
+    static let unchangedDifferenceThreshold = ScreenSettleTracker.Policy().unchangedDifferenceThreshold
 
     /// Captures a thumbnail of the display the mouse is on, leaving out
     /// Sage's own windows (its cursor animates, which would look like change).
     static func captureThumbnailOfDisplayUnderMouse() async -> ScreenThumbnail? {
+        await makeThumbnailCapturerForDisplayUnderMouse()?.capture()
+    }
+
+    /// Prepares repeated thumbnail captures of the display under the mouse.
+    /// Listing every display and window is the slow part of a capture, so a
+    /// settle check does it once and then samples quickly.
+    static func makeThumbnailCapturerForDisplayUnderMouse() async -> ScreenThumbnailCapturer? {
         guard let shareableContent = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) else {
             return nil
         }
@@ -68,19 +73,15 @@ enum ScreenChangeDetector {
         streamConfiguration.width = thumbnailWidth
         streamConfiguration.height = thumbnailHeight
 
-        guard let thumbnailImage = try? await SCScreenshotManager.captureImage(
+        return ScreenThumbnailCapturer(
             contentFilter: SCContentFilter(display: displayToCapture, excludingWindows: sageOwnWindows),
-            configuration: streamConfiguration
-        ) else {
-            return nil
-        }
-
-        return grayscaleThumbnail(from: thumbnailImage, width: thumbnailWidth, height: thumbnailHeight)
+            streamConfiguration: streamConfiguration
+        )
     }
 
     /// Redraws the capture into a small 8-bit grayscale buffer so comparing
     /// two thumbnails is a simple byte-by-byte difference.
-    private static func grayscaleThumbnail(from image: CGImage, width: Int, height: Int) -> ScreenThumbnail? {
+    fileprivate static func grayscaleThumbnail(from image: CGImage, width: Int, height: Int) -> ScreenThumbnail? {
         var grayscalePixels = [UInt8](repeating: 0, count: width * height)
         let didDraw = grayscalePixels.withUnsafeMutableBytes { pixelBuffer -> Bool in
             guard let grayscaleContext = CGContext(
@@ -99,5 +100,24 @@ enum ScreenChangeDetector {
             return true
         }
         return didDraw ? ScreenThumbnail(grayscalePixels: grayscalePixels) : nil
+    }
+}
+
+/// Takes thumbnails of one display with a fixed filter, so each sample is
+/// only the capture itself.
+struct ScreenThumbnailCapturer {
+    let contentFilter: SCContentFilter
+    let streamConfiguration: SCStreamConfiguration
+
+    func capture() async -> ScreenThumbnail? {
+        guard let thumbnailImage = try? await SCScreenshotManager.captureImage(
+            contentFilter: contentFilter,
+            configuration: streamConfiguration
+        ) else {
+            return nil
+        }
+        return ScreenChangeDetector.grayscaleThumbnail(from: thumbnailImage,
+                                                       width: streamConfiguration.width,
+                                                       height: streamConfiguration.height)
     }
 }

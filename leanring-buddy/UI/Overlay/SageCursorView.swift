@@ -55,6 +55,9 @@ struct SageCursorView: View {
     @State private var pointingBubbleText = ""
     @State private var pointingBubbleOpacity: Double = 0
     @State private var pointingBubbleScale: CGFloat = 1
+    /// Bumped whenever the bubble's text is replaced, so a type-out still in
+    /// progress for the old text stops instead of appending to the new one.
+    @State private var pointingBubbleTextGeneration = 0
 
     init(screenFrame: CGRect, isFirstAppearance: Bool, sessionCoordinator: SageSessionCoordinator) {
         self.screenFrame = screenFrame
@@ -79,6 +82,12 @@ struct SageCursorView: View {
             // Nearly invisible fill keeps the hosting view compositing correctly.
             Color.black.opacity(0.001)
 
+            // The pen trail while the shortcut is held, then the finished loop
+            // around what the user circled until Sage has answered.
+            gestureTrail
+            circledAreaHighlight
+                .animation(.easeOut(duration: 0.2), value: sessionCoordinator.circledAreaFocusRect)
+
             speechBubbleNextToCursor(text: welcomeText)
                 .opacity(isMouseOnThisScreen ? welcomeBubbleOpacity : 0)
                 .animation(.easeOut(duration: 0.4), value: welcomeBubbleOpacity)
@@ -95,7 +104,7 @@ struct SageCursorView: View {
             if sessionCoordinator.isFollowingAlong && isCursorVisibleOnThisScreen {
                 FollowAlongPulseView()
                     .position(cursorPosition)
-                    .animation(navigationMode == .followingCursor ? Self.followSpring : nil, value: cursorPosition)
+                    .animation(navigationMode == .flying ? nil : Self.followSpring, value: cursorPosition)
                     .allowsHitTesting(false)
             }
 
@@ -103,15 +112,16 @@ struct SageCursorView: View {
             // cross-fade, so SwiftUI never removes and re-inserts them (which
             // makes the cursor visibly pop).
             CursorTriangle()
-                .fill(CursorAppearance.Colors.cursor)
+                .fill(cursorColor)
                 .frame(width: 16, height: 16)
                 .rotationEffect(.degrees(triangleRotationDegrees))
-                .shadow(color: CursorAppearance.Colors.cursor, radius: 8 + (flightScale - 1) * 20)
+                .shadow(color: cursorColor, radius: 8 + (flightScale - 1) * 20)
                 .scaleEffect(flightScale)
                 .opacity(isCursorVisibleOnThisScreen && isShowingTriangle ? cursorOpacity : 0)
                 .position(cursorPosition)
-                // While flying, a timer moves the cursor every frame, so no implicit animation.
-                .animation(navigationMode == .followingCursor ? Self.followSpring : nil, value: cursorPosition)
+                // While flying, a timer moves the cursor every frame, so no implicit
+                // animation. Parked at a target, the spring smooths scroll-following.
+                .animation(navigationMode == .flying ? nil : Self.followSpring, value: cursorPosition)
                 .animation(.easeIn(duration: 0.25), value: sessionCoordinator.voiceState)
                 .animation(navigationMode == .flying ? nil : .easeInOut(duration: 0.3), value: triangleRotationDegrees)
 
@@ -128,6 +138,12 @@ struct SageCursorView: View {
                 .animation(.easeIn(duration: 0.15), value: sessionCoordinator.voiceState)
         }
         .frame(width: screenFrame.width, height: screenFrame.height)
+        // Every indicator reads the chosen color from the environment.
+        .environment(\.sageCursorColor, cursorColor)
+        .environment(\.sageCursorTextColor, sessionCoordinator.cursorColorOption.textColor)
+        // Voice-only mode: Sage still listens and talks, but draws nothing.
+        .opacity(sessionCoordinator.cursorColorOption.isInvisible ? 0 : 1)
+        .animation(.easeInOut(duration: 0.25), value: sessionCoordinator.cursorColorOption)
         .ignoresSafeArea()
         .onAppear(perform: handleAppear)
         .onDisappear {
@@ -136,6 +152,40 @@ struct SageCursorView: View {
         }
         .onChange(of: sessionCoordinator.currentPointingTarget) { _, newPointingTarget in
             handleNewPointingTarget(newPointingTarget)
+        }
+    }
+
+    // MARK: - Drawing
+
+    private var cursorColor: Color {
+        sessionCoordinator.cursorColorOption.cursorColor
+    }
+
+    private var gestureTrail: some View {
+        Path { trailPath in
+            trailPath.addLines(sessionCoordinator.gestureTrailPoints.map(convertScreenPointToViewCoordinates))
+        }
+        .stroke(cursorColor.opacity(0.75), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        .shadow(color: cursorColor.opacity(0.6), radius: 4)
+        .allowsHitTesting(false)
+    }
+
+    /// Once the shortcut is released, the rough hand-drawn loop is replaced
+    /// by a clean circle (or ellipse) that draws itself around the item.
+    @ViewBuilder
+    private var circledAreaHighlight: some View {
+        if let focusRect = sessionCoordinator.circledAreaFocusRect {
+            let ringRectInView = CGRect(
+                x: focusRect.minX - screenFrame.minX,
+                y: screenFrame.maxY - focusRect.maxY,
+                width: focusRect.width,
+                height: focusRect.height
+            )
+            CircledAreaRing(ringRect: ringRectInView)
+                // A new circle replays the draw-in animation.
+                .id("\(focusRect.origin.x),\(focusRect.origin.y),\(focusRect.width),\(focusRect.height)")
+                .transition(.opacity)
+                .allowsHitTesting(false)
         }
     }
 
@@ -175,7 +225,7 @@ struct SageCursorView: View {
                 }
             }
             .position(cursorPosition)
-            .animation(navigationMode == .followingCursor ? Self.followSpring : nil, value: cursorPosition)
+            .animation(navigationMode == .flying ? nil : Self.followSpring, value: cursorPosition)
     }
 
     // MARK: - Appearance
@@ -269,7 +319,14 @@ struct SageCursorView: View {
         let isTargetOnThisScreen = screenFrame.contains(targetDisplayCenter) || newPointingTarget.displayFrame == screenFrame
 
         if isTargetOnThisScreen {
-            flyToTarget(newPointingTarget)
+            if newPointingTarget.id == activeTargetID && navigationMode == .pointingAtTarget {
+                // The same target moved (the user scrolled): glide with it.
+                followMovedTarget(newPointingTarget)
+            } else {
+                // A new target, or the one being flown to moved mid-flight:
+                // fly from wherever the cursor is now.
+                flyToTarget(newPointingTarget)
+            }
         } else if navigationMode != .followingCursor {
             // The walkthrough moved to another monitor. Stop here quietly
             // without clearing the target the other screen is flying to.
@@ -277,13 +334,42 @@ struct SageCursorView: View {
         }
     }
 
-    private func flyToTarget(_ pointingTarget: PointingTarget) {
+    /// Just below-right of the element, so the triangle's tip points at it.
+    private func parkingSpot(for pointingTarget: PointingTarget) -> CGPoint {
         let targetInView = convertScreenPointToViewCoordinates(pointingTarget.globalScreenLocation)
-        // Park just below-right of the element so the triangle's tip points at it.
-        let parkingSpot = CGPoint(
+        return CGPoint(
             x: max(20, min(targetInView.x + 8, screenFrame.width - 20)),
             y: max(20, min(targetInView.y + 12, screenFrame.height - 20))
         )
+    }
+
+    /// The label, or which way to scroll when the element is out of view.
+    private func bubbleText(for pointingTarget: PointingTarget) -> String {
+        let label = (pointingTarget.label?.isEmpty == false) ? pointingTarget.label! : "right here"
+        guard let offScreenEdge = pointingTarget.offScreenEdge else { return label }
+        return pointingTarget.label?.isEmpty == false
+            ? "\(offScreenEdge.scrollInstruction) for \(label)"
+            : offScreenEdge.scrollInstruction
+    }
+
+    /// Resting tilt at a visible target; aimed at the edge for a hidden one.
+    private func parkedRotationDegrees(for pointingTarget: PointingTarget) -> Double {
+        pointingTarget.offScreenEdge?.cursorRotationDegrees ?? Self.restingRotationDegrees
+    }
+
+    private func followMovedTarget(_ pointingTarget: PointingTarget) {
+        cursorPosition = parkingSpot(for: pointingTarget)
+        triangleRotationDegrees = parkedRotationDegrees(for: pointingTarget)
+        let newBubbleText = bubbleText(for: pointingTarget)
+        if newBubbleText != pointingBubbleText {
+            pointingBubbleTextGeneration += 1
+            pointingBubbleText = newBubbleText
+            pointingBubbleScale = 1
+        }
+    }
+
+    private func flyToTarget(_ pointingTarget: PointingTarget) {
+        let parkingSpot = parkingSpot(for: pointingTarget)
 
         activeTargetID = pointingTarget.id
         navigationMode = .flying
@@ -299,15 +385,16 @@ struct SageCursorView: View {
 
     private func startPointing(at pointingTarget: PointingTarget) {
         navigationMode = .pointingAtTarget
-        triangleRotationDegrees = Self.restingRotationDegrees
+        triangleRotationDegrees = parkedRotationDegrees(for: pointingTarget)
 
+        pointingBubbleTextGeneration += 1
+        let typingGeneration = pointingBubbleTextGeneration
         pointingBubbleText = ""
         pointingBubbleScale = 0.5
         pointingBubbleOpacity = 1
 
-        let bubbleLabel = (pointingTarget.label?.isEmpty == false) ? pointingTarget.label! : "right here"
-        typeOutText(bubbleLabel, characterIndex: 0, appendCharacter: { character in
-            guard activeTargetID == pointingTarget.id else { return }
+        typeOutText(bubbleText(for: pointingTarget), characterIndex: 0, appendCharacter: { character in
+            guard activeTargetID == pointingTarget.id, pointingBubbleTextGeneration == typingGeneration else { return }
             if pointingBubbleText.isEmpty {
                 // Pop the bubble in as the first letter appears.
                 pointingBubbleScale = 1

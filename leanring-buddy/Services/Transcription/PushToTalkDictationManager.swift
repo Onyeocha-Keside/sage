@@ -32,9 +32,14 @@ final class PushToTalkDictationManager: ObservableObject {
     private let audioEngine = AVAudioEngine()
     private var activeTranscriptionSession: SpeechTranscriptionSession?
     private var onFinalTranscript: ((String) -> Void)?
+    private var onNoSpeech: (() -> Void)?
     private var latestRecognizedText = ""
     private var hasFinishedCurrentSession = false
-    private var finalizeFallbackWorkItem: DispatchWorkItem?
+    /// When the partial transcript last changed, so finalization can tell
+    /// when the recognizer has settled.
+    private var latestTranscriptChangeInstant = ContinuousClock.now
+    private let finalizationPolicy = TranscriptFinalizationPolicy()
+    private var finalizationTask: Task<Void, Never>?
     /// Changes on every start/stop so a slow start can tell it was superseded.
     private var currentStartRequestIdentifier = UUID()
     private var currentRecognitionIdentifier = UUID()
@@ -61,8 +66,9 @@ final class PushToTalkDictationManager: ObservableObject {
     // MARK: - Recording
 
     /// Starts recording. `onFinalTranscript` is called once with the
-    /// transcript after `stopRecordingAndTranscribe()`, unless nothing was said.
-    func startRecording(onFinalTranscript: @escaping (String) -> Void) async {
+    /// transcript after `stopRecordingAndTranscribe()`. If nothing was said,
+    /// `onNoSpeech` is called instead (circling something silently is still a question).
+    func startRecording(onFinalTranscript: @escaping (String) -> Void, onNoSpeech: (() -> Void)? = nil) async {
         guard !isDictationInProgress else { return }
 
         let startRequestIdentifier = UUID()
@@ -80,8 +86,10 @@ final class PushToTalkDictationManager: ObservableObject {
 
         isPreparingToRecord = true
         latestRecognizedText = ""
+        latestTranscriptChangeInstant = ContinuousClock.now
         hasFinishedCurrentSession = false
         self.onFinalTranscript = onFinalTranscript
+        self.onNoSpeech = onNoSpeech
 
         do {
             try startRecognitionSession()
@@ -122,24 +130,39 @@ final class PushToTalkDictationManager: ObservableObject {
         audioEngine.inputNode.removeTap(onBus: 0)
         activeTranscriptionSession?.requestFinalTranscript()
 
-        // Safety net in case the recognizer never sends a final result.
-        let fallbackDelaySeconds = activeTranscriptionSession?.finalTranscriptFallbackDelaySeconds ?? 1.8
-        finalizeFallbackWorkItem?.cancel()
-        let fallbackWorkItem = DispatchWorkItem { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.finishCurrentSessionIfNeeded()
+        // Apple's final result can lag a second or more behind the live
+        // partial transcript. Finish as soon as the partial settles, or at the
+        // policy's maximum wait if the recognizer goes quiet.
+        let releaseInstant = ContinuousClock.now
+        finalizationTask?.cancel()
+        finalizationTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                guard let self, !Task.isCancelled, !self.hasFinishedCurrentSession else { return }
+                let shouldFinish = self.finalizationPolicy.shouldFinish(
+                    secondsSinceRelease: Self.seconds(since: releaseInstant),
+                    secondsSinceTranscriptLastChanged: Self.seconds(since: self.latestTranscriptChangeInstant),
+                    hasTranscriptText: !self.latestRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+                if shouldFinish {
+                    self.finishCurrentSessionIfNeeded()
+                    return
+                }
             }
         }
-        finalizeFallbackWorkItem = fallbackWorkItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + fallbackDelaySeconds, execute: fallbackWorkItem)
+    }
+
+    private static func seconds(since instant: ContinuousClock.Instant) -> TimeInterval {
+        let elapsed = ContinuousClock.now - instant
+        return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
     }
 
     /// Throws away the current recording without producing a transcript.
     func cancel() {
         currentStartRequestIdentifier = UUID()
         guard isDictationInProgress else { return }
-        finalizeFallbackWorkItem?.cancel()
-        finalizeFallbackWorkItem = nil
+        finalizationTask?.cancel()
+        finalizationTask = nil
         tearDownAudioAndSession()
         resetSessionState()
     }
@@ -154,8 +177,11 @@ final class PushToTalkDictationManager: ObservableObject {
         activeTranscriptionSession = try AppleSpeechTranscriber.startSession(
             onTranscriptUpdate: { [weak self] transcriptText in
                 Task { @MainActor in
-                    guard self?.currentRecognitionIdentifier == recognitionIdentifier else { return }
-                    self?.latestRecognizedText = transcriptText
+                    guard let self, self.currentRecognitionIdentifier == recognitionIdentifier else { return }
+                    if transcriptText != self.latestRecognizedText {
+                        self.latestTranscriptChangeInstant = ContinuousClock.now
+                    }
+                    self.latestRecognizedText = transcriptText
                 }
             },
             onFinalTranscriptReady: { [weak self] transcriptText in
@@ -199,7 +225,9 @@ final class PushToTalkDictationManager: ObservableObject {
             finishCurrentSessionIfNeeded()
         } else if isNoSpeechDetectedError {
             logger.notice("Recording finished but no speech was detected")
+            let noSpeechCallback = isFinalizingTranscript ? onNoSpeech : nil
             cancel()
+            noSpeechCallback?()
         } else {
             print("❌ Speech recognition error: \(error)")
             logger.error("Speech recognition error: \(String(describing: error), privacy: .public)")
@@ -218,11 +246,12 @@ final class PushToTalkDictationManager: ObservableObject {
         guard !hasFinishedCurrentSession else { return }
         hasFinishedCurrentSession = true
 
-        finalizeFallbackWorkItem?.cancel()
-        finalizeFallbackWorkItem = nil
+        finalizationTask?.cancel()
+        finalizationTask = nil
 
         let finalTranscript = latestRecognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let transcriptCallback = onFinalTranscript
+        let noSpeechCallback = onNoSpeech
 
         tearDownAudioAndSession()
         resetSessionState()
@@ -230,6 +259,7 @@ final class PushToTalkDictationManager: ObservableObject {
         guard !finalTranscript.isEmpty else {
             print("🎙️ Nothing was said")
             logger.notice("Recording finished but no speech was recognized")
+            noSpeechCallback?()
             return
         }
         logger.notice("Recording transcribed successfully")
@@ -246,6 +276,7 @@ final class PushToTalkDictationManager: ObservableObject {
 
     private func resetSessionState() {
         onFinalTranscript = nil
+        onNoSpeech = nil
         latestRecognizedText = ""
         isPreparingToRecord = false
         isRecording = false

@@ -194,6 +194,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func addReadyItems() {
         addInformationItem("Hold \(GlobalPushToTalkShortcutMonitor.shortcutDisplayText) to ask anything", symbolName: "keyboard")
+        addInformationItem("Circle something while holding to ask about it", symbolName: "lasso")
         statusMenu.addItem(.separator())
 
         // Voice ▸ Mac / ElevenLabs
@@ -210,6 +211,27 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         voiceMenuItem.submenu = voiceSubmenu
         statusMenu.addItem(voiceMenuItem)
+
+        // Cursor ▸ colors, or Invisible for voice only
+        let cursorMenuItem = NSMenuItem(title: "Cursor", action: nil, keyEquivalent: "")
+        cursorMenuItem.image = Self.symbolImage("cursorarrow")
+        let cursorSubmenu = NSMenu()
+        cursorSubmenu.autoenablesItems = false
+        for colorOption in CursorColorOption.allCases {
+            if colorOption.isInvisible {
+                cursorSubmenu.addItem(.separator())
+            }
+            let colorOptionItem = NSMenuItem(title: colorOption.displayName, action: #selector(selectCursorColor(_:)), keyEquivalent: "")
+            colorOptionItem.target = self
+            colorOptionItem.representedObject = colorOption.rawValue
+            colorOptionItem.image = colorOption.isInvisible
+                ? Self.symbolImage("eye.slash")
+                : Self.statusDotImage(color: colorOption.menuSwatchColor)
+            colorOptionItem.state = sessionCoordinator.cursorColorOption == colorOption ? .on : .off
+            cursorSubmenu.addItem(colorOptionItem)
+        }
+        cursorMenuItem.submenu = cursorSubmenu
+        statusMenu.addItem(cursorMenuItem)
 
         let soundsItem = addActionItem("Sounds", symbolName: "speaker.wave.2", action: #selector(toggleSoundEffects))
         soundsItem.state = sessionCoordinator.areSoundEffectsEnabled ? .on : .off
@@ -335,6 +357,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let voiceRawValue = sender.representedObject as? String,
               let voiceOption = SageVoiceOption(rawValue: voiceRawValue) else { return }
         sessionCoordinator.selectVoice(voiceOption)
+    }
+
+    @objc private func selectCursorColor(_ sender: NSMenuItem) {
+        guard let colorRawValue = sender.representedObject as? String,
+              let colorOption = CursorColorOption(rawValue: colorRawValue) else { return }
+        sessionCoordinator.selectCursorColor(colorOption)
     }
 
     @objc private func toggleSoundEffects() {

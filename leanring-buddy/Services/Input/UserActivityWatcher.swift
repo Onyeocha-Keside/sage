@@ -17,15 +17,13 @@ import Foundation
 
 @MainActor
 final class UserActivityWatcher {
-    /// After a click or scroll, wait at least this long before checking
-    /// whether the screen has settled.
-    private static let minimumQuietAfterClickSeconds: TimeInterval = 0.35
+    /// After a click or scroll, start sampling almost at once. The settle
+    /// tracker waits for a visible change, so looking early is safe.
+    private static let minimumQuietAfterClickSeconds: TimeInterval = 0.1
     /// Typing gets a longer pause so Sage doesn't look mid-word.
     private static let minimumQuietAfterTypingSeconds: TimeInterval = 1.2
     /// How often to compare thumbnails while waiting for the screen to settle.
-    private static let settleCheckIntervalSeconds: TimeInterval = 0.25
-    /// Pages with spinners or videos never fully stop changing. Look anyway after this.
-    private static let maximumSettleWaitSeconds: TimeInterval = 4.0
+    private static let settleCheckIntervalSeconds: TimeInterval = 0.1
     /// Follow-along ends quietly if you don't do anything for this long.
     private static let idleTimeoutSeconds: TimeInterval = 120
 
@@ -38,19 +36,25 @@ final class UserActivityWatcher {
     private var idleTimeoutTimer: Timer?
     private var settleDetectionTask: Task<Void, Never>?
     private var hasSeenFirstActivity = false
-    private var onFirstActivity: (() -> Void)?
-    private var onScreenSettled: (() -> Void)?
+    /// The most recent thumbnail: taken when watching starts, then updated by
+    /// every settle check. It's the "before" picture for the next action.
+    private var latestThumbnail: ScreenThumbnail?
+    private var baselineCaptureTask: Task<Void, Never>?
+    private var onFirstActivity: ((_ wasScrolling: Bool) -> Void)?
+    private var onScreenSettled: ((_ settledThumbnail: ScreenThumbnail?) -> Void)?
     private var onIdleTimeout: (() -> Void)?
 
     var isWatching: Bool { globalActivityMonitor != nil }
 
     /// Starts watching.
-    /// - `onFirstActivity`: the instant the user first clicks, types, or scrolls.
-    /// - `onScreenSettled`: once, after that activity has finished changing the screen.
+    /// - `onFirstActivity`: the instant the user first clicks, types, or scrolls,
+    ///   and whether it was a scroll (the pointed-at element may still be there).
+    /// - `onScreenSettled`: once, after that activity has finished changing the
+    ///   screen, with the last thumbnail (what the settled screen looks like).
     /// - `onIdleTimeout`: if the user does nothing at all for two minutes.
     func startWatching(
-        onFirstActivity: @escaping () -> Void,
-        onScreenSettled: @escaping () -> Void,
+        onFirstActivity: @escaping (_ wasScrolling: Bool) -> Void,
+        onScreenSettled: @escaping (_ settledThumbnail: ScreenThumbnail?) -> Void,
         onIdleTimeout: @escaping () -> Void
     ) {
         stopWatching()
@@ -58,17 +62,25 @@ final class UserActivityWatcher {
         self.onScreenSettled = onScreenSettled
         self.onIdleTimeout = onIdleTimeout
 
+        baselineCaptureTask = Task { [weak self] in
+            let baselineThumbnail = await ScreenChangeDetector.captureThumbnailOfDisplayUnderMouse()
+            guard let self, !Task.isCancelled, self.latestThumbnail == nil else { return }
+            self.latestThumbnail = baselineThumbnail
+        }
+
         globalActivityMonitor = NSEvent.addGlobalMonitorForEvents(matching: Self.watchedEvents) { [weak self] activityEvent in
             let wasTyping = activityEvent.type == .keyDown
+            let wasScrolling = activityEvent.type == .scrollWheel
             Task { @MainActor [weak self] in
-                self?.handleUserActivity(wasTyping: wasTyping)
+                self?.handleUserActivity(wasTyping: wasTyping, wasScrolling: wasScrolling)
             }
         }
         // Global monitors skip events aimed at Sage itself, so watch those too.
         localActivityMonitor = NSEvent.addLocalMonitorForEvents(matching: Self.watchedEvents) { [weak self] activityEvent in
             let wasTyping = activityEvent.type == .keyDown
+            let wasScrolling = activityEvent.type == .scrollWheel
             Task { @MainActor [weak self] in
-                self?.handleUserActivity(wasTyping: wasTyping)
+                self?.handleUserActivity(wasTyping: wasTyping, wasScrolling: wasScrolling)
             }
             return activityEvent
         }
@@ -81,6 +93,22 @@ final class UserActivityWatcher {
                 idleTimeoutCallback?()
             }
         }
+    }
+
+    /// Sage looked too early: the screen kept changing afterwards. Watches
+    /// again as if the user had just clicked, with the screen Sage already
+    /// looked at as the "before" picture, so it waits for the change to finish.
+    func restartSettleCheck(
+        comparedWith alreadySeenThumbnail: ScreenThumbnail?,
+        onScreenSettled: @escaping (_ settledThumbnail: ScreenThumbnail?) -> Void,
+        onIdleTimeout: @escaping () -> Void
+    ) {
+        startWatching(onFirstActivity: { _ in }, onScreenSettled: onScreenSettled, onIdleTimeout: onIdleTimeout)
+        baselineCaptureTask?.cancel()
+        baselineCaptureTask = nil
+        latestThumbnail = alreadySeenThumbnail
+        hasSeenFirstActivity = true
+        handleUserActivity(wasTyping: false, wasScrolling: false)
     }
 
     func stopWatching() {
@@ -96,6 +124,9 @@ final class UserActivityWatcher {
         idleTimeoutTimer = nil
         settleDetectionTask?.cancel()
         settleDetectionTask = nil
+        baselineCaptureTask?.cancel()
+        baselineCaptureTask = nil
+        latestThumbnail = nil
         hasSeenFirstActivity = false
         onFirstActivity = nil
         onScreenSettled = nil
@@ -104,7 +135,7 @@ final class UserActivityWatcher {
 
     /// Every click, key, or scroll restarts the settle check, so typing a
     /// search term or clicking through a menu counts as one action.
-    private func handleUserActivity(wasTyping: Bool) {
+    private func handleUserActivity(wasTyping: Bool, wasScrolling: Bool) {
         guard isWatching else { return }
 
         idleTimeoutTimer?.invalidate()
@@ -112,25 +143,29 @@ final class UserActivityWatcher {
 
         if !hasSeenFirstActivity {
             hasSeenFirstActivity = true
-            onFirstActivity?()
+            onFirstActivity?(wasScrolling)
         }
 
         let minimumQuietSeconds = wasTyping ? Self.minimumQuietAfterTypingSeconds : Self.minimumQuietAfterClickSeconds
+        let baselineThumbnail = latestThumbnail
         settleDetectionTask?.cancel()
         settleDetectionTask = Task { [weak self] in
-            let didSettle = await Self.waitForScreenToSettle(minimumQuietSeconds: minimumQuietSeconds)
-            guard didSettle, !Task.isCancelled, let self else { return }
+            guard let didSettle = await self?.waitForScreenToSettle(minimumQuietSeconds: minimumQuietSeconds,
+                                                                    baselineThumbnail: baselineThumbnail),
+                  didSettle, !Task.isCancelled, let self else { return }
             let screenSettledCallback = self.onScreenSettled
+            let settledThumbnail = self.latestThumbnail
             self.stopWatching()
-            screenSettledCallback?()
+            screenSettledCallback?(settledThumbnail)
         }
     }
 
-    /// Waits for the minimum quiet time, then compares thumbnails until two in
-    /// a row match (or the maximum wait passes). Returns false if cancelled
-    /// because the user did something else in the meantime.
-    private static func waitForScreenToSettle(minimumQuietSeconds: TimeInterval) async -> Bool {
-        let settleStartDate = Date()
+    /// Waits for the minimum quiet time, then samples thumbnails until the
+    /// settle tracker says the screen has visibly changed and held still (or
+    /// the maximum wait passes). Returns false if cancelled because the user
+    /// did something else in the meantime.
+    private func waitForScreenToSettle(minimumQuietSeconds: TimeInterval, baselineThumbnail: ScreenThumbnail?) async -> Bool {
+        let activityInstant = ContinuousClock.now
 
         do {
             try await Task.sleep(for: .seconds(minimumQuietSeconds))
@@ -138,22 +173,27 @@ final class UserActivityWatcher {
             return false
         }
 
+        let thumbnailCapturer = await ScreenChangeDetector.makeThumbnailCapturerForDisplayUnderMouse()
+        var settleTracker = ScreenSettleTracker(hasBaseline: baselineThumbnail != nil)
         var previousThumbnail: ScreenThumbnail?
         while !Task.isCancelled {
-            let currentThumbnail = await ScreenChangeDetector.captureThumbnailOfDisplayUnderMouse()
-
-            if let previousThumbnail, let currentThumbnail,
-               currentThumbnail.averageDifference(from: previousThumbnail) < ScreenChangeDetector.unchangedDifferenceThreshold {
-                return true
+            let currentThumbnail = await thumbnailCapturer?.capture()
+            if let currentThumbnail {
+                latestThumbnail = currentThumbnail
             }
-            // Without thumbnails (capture failed) fall back to the time limit.
-            if Date().timeIntervalSince(settleStartDate) >= maximumSettleWaitSeconds {
+            let elapsed = ContinuousClock.now - activityInstant
+            let hasSettled = settleTracker.observe(
+                secondsSinceActivity: Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18,
+                differenceFromPrevious: currentThumbnail.flatMap { current in previousThumbnail.map { current.averageDifference(from: $0) } },
+                differenceFromBaseline: currentThumbnail.flatMap { current in baselineThumbnail.map { current.averageDifference(from: $0) } }
+            )
+            if hasSettled {
                 return true
             }
             previousThumbnail = currentThumbnail
 
             do {
-                try await Task.sleep(for: .seconds(settleCheckIntervalSeconds))
+                try await Task.sleep(for: .seconds(Self.settleCheckIntervalSeconds))
             } catch {
                 return false
             }
