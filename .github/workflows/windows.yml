@@ -1,0 +1,30 @@
+name: Windows app
+on:
+  pull_request:
+    paths: ['windows/**', '.github/workflows/windows.yml']
+  push:
+    branches: [main]
+    paths: ['windows/**', '.github/workflows/windows.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test tests/Sage.Core.Tests -c Release
+      - name: Publish prototype
+        run: |
+          dotnet publish src/Sage.Windows -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/win-x64
+          dotnet publish src/Sage.Windows -c Release -r win-arm64 --self-contained -p:PublishSingleFile=true -o publish/win-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sage-prototype
+          path: windows/publish/
+          retention-days: 14
