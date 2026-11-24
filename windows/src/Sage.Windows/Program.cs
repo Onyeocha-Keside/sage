@@ -9,10 +9,12 @@ namespace Sage.Windows;
 
 /// <summary>
 /// Prototype for the riskiest Windows pieces: capture, the overlay, hold-to-talk, and
-/// pointing at the right pixel across monitors. It makes no network calls.
+/// pointing at the right pixel across monitors, plus a typed-question turn through the Worker.
 ///
-///   SagePrototype --diagnose   Runs automatic checks and prints PASS or FAIL.
-///   SagePrototype              Hold Ctrl + Win to capture and tour every monitor. Ctrl + C quits.
+///   SagePrototype --diagnose   Runs automatic checks and prints PASS or FAIL. No network.
+///   SagePrototype              Hold Ctrl + Win to capture and tour every monitor. No network.
+///   SagePrototype --setup      Saves the Worker address and the user's Sage access token.
+///   SagePrototype --ask "..."  Sends the question and screenshots to the Worker; speaks and points.
 /// </summary>
 internal static class Program
 {
@@ -42,20 +44,120 @@ internal static class Program
             return 2;
         }
 
-        return arguments.Contains("--diagnose") ? Diagnose().GetAwaiter().GetResult() : RunInteractive();
+        if (arguments.Contains("--diagnose")) return Diagnose().GetAwaiter().GetResult();
+        if (arguments.Contains("--setup")) return Setup();
+
+        int askIndex = Array.IndexOf(arguments, "--ask");
+        if (askIndex >= 0)
+        {
+            string question = string.Join(' ', arguments.Skip(askIndex + 1)).Trim();
+            return question.Length > 0 ? RunAsk(question) : Usage("Put your question after --ask.");
+        }
+
+        return RunInteractive(OnHoldStarted, "Hold Ctrl + Win to capture and tour every monitor.");
     }
+
+    private static int Usage(string problem)
+    {
+        Console.Error.WriteLine(problem);
+        Console.Error.WriteLine("""
+            Usage:
+              SagePrototype                       Hold Ctrl + Win to capture and tour every monitor.
+              SagePrototype --diagnose            Automatic checks.
+              SagePrototype --setup               Save the Worker address and your Sage access token.
+              SagePrototype --ask "your question" Ask Claude about your screen; the reply is spoken.
+            """);
+        return 2;
+    }
+
+    // MARK: - Setup
+
+    private static int Setup()
+    {
+        Console.WriteLine("Sage setup. Your access token is saved in Windows Credential Manager, not in a file.");
+        Console.WriteLine($"Current Worker address: {SageSettings.WorkerBaseUri?.ToString() ?? "(none)"}");
+        Console.Write("Worker address (https://..., or Enter to keep): ");
+        string? address = Console.ReadLine()?.Trim();
+        if (!string.IsNullOrEmpty(address))
+        {
+            var uri = Sage.Core.Networking.SageWorkerClient.ValidateBaseUri(address);
+            if (uri is null) return Usage("The Worker address must start with https:// (http is allowed only for localhost).");
+            SageSettings.WorkerBaseUri = uri;
+        }
+
+        Console.Write($"Sage access token ({(SageSettings.AccessToken is null ? "none saved" : "one is saved")}; Enter to keep): ");
+        string token = ReadHidden();
+        if (token.Length > 0)
+        {
+            if (!Sage.Core.Networking.SageWorkerClient.IsAccessTokenFormat(token))
+            {
+                return Usage("That isn't a Sage access token. It starts with sage_ and comes from whoever runs your Worker. Never paste an Anthropic key here.");
+            }
+
+            SageSettings.AccessToken = token;
+        }
+
+        bool ready = SageSettings.WorkerBaseUri is not null && SageSettings.AccessToken is not null;
+        Console.WriteLine(ready ? "Saved. Try: SagePrototype --ask \"what am i looking at?\"" : "Setup isn't complete yet.");
+        return ready ? 0 : 1;
+    }
+
+    private static string ReadHidden()
+    {
+        var typed = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter) break;
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (typed.Length > 0) typed.Length--;
+            }
+            else if (!char.IsControl(key.KeyChar))
+            {
+                typed.Append(key.KeyChar);
+            }
+        }
+
+        Console.WriteLine();
+        return typed.ToString().Trim();
+    }
+
+    // MARK: - Ask
+
+    private static int RunAsk(string question)
+    {
+        if (SageSettings.WorkerBaseUri is not { } worker || SageSettings.AccessToken is not { } token)
+        {
+            return Usage("Sage isn't set up yet. Run SagePrototype --setup first.");
+        }
+
+        using var voice = new WindowsSpeechVoice();
+        using var session = new AskSession(new Sage.Core.Networking.SageWorkerClient(worker, token), voice, FlyTo);
+        Console.WriteLine($"Voice: {voice.VoiceName}. Worker: {worker}");
+        return RunInteractive(() => session.Start(question),
+            "Asking now. Hold Ctrl + Win to ask again with a fresh screenshot.",
+            onReady: () => session.Start(question));
+    }
+
+    private static void FlyTo(PointingTarget target) => s_pendingTargets.Enqueue(target);
 
     // MARK: - Interactive
 
-    private static int RunInteractive()
+    private static int RunInteractive(Action onHold, string instructions, Action? onReady = null)
     {
         nint window = CreateOverlayWindow();
         s_overlay = new CursorOverlay(window, SageGreen);
-        s_holdToTalk = new HoldToTalkMonitor(window, OnHoldStarted, static () => Console.WriteLine("released"));
+        s_holdToTalk = new HoldToTalkMonitor(window, () =>
+        {
+            Console.WriteLine("pressed");
+            onHold();
+        }, static () => Console.WriteLine("released"));
         s_holdToTalk.Start();
         s_tip = OffsetFromMouse();
         Native.SetTimer(window, FrameTimerId, 16, 0);
-        Console.WriteLine("Hold Ctrl + Win to capture and tour every monitor. Press Ctrl + C here to quit.");
+        Console.WriteLine($"{instructions} Press Ctrl + C here to quit.");
+        onReady?.Invoke();
 
         while (Native.GetMessageW(out var message, 0, 0, 0) > 0)
         {
@@ -69,7 +171,7 @@ internal static class Program
 
     private static void OnHoldStarted()
     {
-        Console.WriteLine("pressed: capturing...");
+        Console.WriteLine("capturing...");
         nint window = s_overlay!.Window;
         _ = Task.Run(async () =>
         {

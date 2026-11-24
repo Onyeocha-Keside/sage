@@ -4,7 +4,7 @@ A native Windows client for Sage, in progress. It will use the same Cloudflare W
 
 ```
 src/Sage.Core/         Logic ported from the Mac app, with no Windows APIs. Builds and tests anywhere.
-src/Sage.Windows/      Prototype of the Windows-only parts. Makes no network calls yet.
+src/Sage.Windows/      Prototype of the Windows-only parts. Only --ask uses the network.
 tests/Sage.Core.Tests/ Unit tests, ported from leanring-buddyTests where the behavior is shared.
 ```
 
@@ -51,6 +51,17 @@ Check each of these:
 - A yellow capture border doesn't appear. `--diagnose` reports whether Windows hid it.
 
 Press Ctrl + C in the terminal to quit.
+
+**3. A real question, without the microphone.** This needs a Worker that's deployed and a Sage access token (`sage_` followed by 64 hex characters). Never use an Anthropic key here.
+
+```powershell
+.\SagePrototype.exe --setup
+.\SagePrototype.exe --ask "what am i looking at?"
+```
+
+`--setup` saves the Worker address to `%LOCALAPPDATA%\Sage\settings.json`. The token goes in Windows Credential Manager under `Sage/AccessToken`. `--ask` captures every monitor and sends the screenshots and your question to the Worker. The reply prints as it arrives and is spoken with a built-in Windows voice. The arrow flies to each thing Claude points at as that sentence starts. Hold **Ctrl + Win** to ask the same question again with a fresh screenshot. This interrupts any reply still playing.
+
+Until the updated Worker that accepts `platform` is deployed, replies may say "mac".
 
 ## What a VM can't prove
 
