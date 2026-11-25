@@ -12,7 +12,8 @@ namespace Sage.Windows;
 /// pointing at the right pixel across monitors, plus a typed-question turn through the Worker.
 ///
 ///   SagePrototype --diagnose   Runs automatic checks and prints PASS or FAIL. No network.
-///   SagePrototype              Hold Ctrl + Win to capture and tour every monitor. No network.
+///   SagePrototype              Hold Ctrl + Win and speak; Sage answers about your screen.
+///   SagePrototype --tour       Hold Ctrl + Win to capture and tour every monitor. No network.
 ///   SagePrototype --setup      Saves the Worker address and the user's Sage access token.
 ///   SagePrototype --ask "..."  Sends the question and screenshots to the Worker; speaks and points.
 /// </summary>
@@ -54,7 +55,9 @@ internal static class Program
             return question.Length > 0 ? RunAsk(question) : Usage("Put your question after --ask.");
         }
 
-        return RunInteractive(OnHoldStarted, "Hold Ctrl + Win to capture and tour every monitor.");
+        if (arguments.Contains("--tour")) return RunInteractive(OnHoldStarted, "Hold Ctrl + Win to capture and tour every monitor.");
+        if (arguments.Contains("--install-speech")) return InstallSpeech() is null ? 1 : 0;
+        return arguments.Length == 0 ? RunVoice() : Usage($"Unknown option: {arguments[0]}");
     }
 
     private static int Usage(string problem)
@@ -62,7 +65,9 @@ internal static class Program
         Console.Error.WriteLine(problem);
         Console.Error.WriteLine("""
             Usage:
-              SagePrototype                       Hold Ctrl + Win to capture and tour every monitor.
+              SagePrototype                       Hold Ctrl + Win, ask out loud, let go. Sage answers and points.
+              SagePrototype --tour                Hold Ctrl + Win to capture and tour every monitor. No network.
+              SagePrototype --install-speech      Download the on-device speech model (about 100 MB).
               SagePrototype --diagnose            Automatic checks.
               SagePrototype --setup               Save the Worker address and your Sage access token.
               SagePrototype --ask "your question" Ask Claude about your screen; the reply is spoken.
@@ -140,11 +145,69 @@ internal static class Program
             onReady: () => session.Start(question));
     }
 
+    // MARK: - Voice
+
+    /// <summary>
+    /// Under ProgramData, not the user profile: sherpa-onnx passes model paths to native code
+    /// as ANSI strings, which can't represent every user name.
+    /// </summary>
+    private static string SpeechModelsFolder =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Sage", "models");
+
+    private static Sage.Transcription.SpeechModelFiles? InstallSpeech()
+    {
+        if (Sage.Transcription.SpeechModel.Find(SpeechModelsFolder) is { } installed) return installed;
+        Console.WriteLine($"Downloading the speech model (about 100 MB) from {Sage.Transcription.SpeechModel.DownloadUri.Host}.");
+        Console.WriteLine("It runs on this PC, so your voice is never uploaded.");
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+            int lastPercent = -1;
+            var progress = new Progress<double>(share =>
+            {
+                int percent = (int)(share * 100);
+                if (percent / 10 != lastPercent / 10) Console.WriteLine($"  {percent}%");
+                lastPercent = percent;
+            });
+            string tar = Path.Combine(Environment.SystemDirectory, "tar.exe");
+            var files = Sage.Transcription.SpeechModel.InstallAsync(SpeechModelsFolder, tar, http, progress).GetAwaiter().GetResult();
+            Console.WriteLine($"Installed in {SpeechModelsFolder}.");
+            return files;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or IOException or InvalidDataException
+                                              or UnauthorizedAccessException or System.ComponentModel.Win32Exception or TaskCanceledException)
+        {
+            Console.Error.WriteLine($"Couldn't install the speech model: {exception.Message}");
+            return null;
+        }
+    }
+
+    private static int RunVoice()
+    {
+        if (SageSettings.WorkerBaseUri is not { } worker || SageSettings.AccessToken is not { } token)
+        {
+            return Usage("Sage isn't set up yet. Run SagePrototype --setup first.");
+        }
+
+        if (InstallSpeech() is not { } model) return 1;
+
+        var loading = Stopwatch.StartNew();
+        using var transcriber = new Sage.Transcription.StreamingTranscriber(model, threads: Math.Clamp(Environment.ProcessorCount / 2, 1, 4));
+        Console.WriteLine($"Speech model loaded in {loading.ElapsedMilliseconds} ms.");
+        using var voice = new WindowsSpeechVoice();
+        var client = new Sage.Core.Networking.SageWorkerClient(worker, token);
+        _ = client.WarmUpAsync();
+        using var ask = new AskSession(client, voice, FlyTo);
+        using var session = new VoiceSession(transcriber, ask);
+        Console.WriteLine($"Voice: {voice.VoiceName}. Worker: {worker}");
+        return RunInteractive(session.Pressed, "Hold Ctrl + Win, ask your question out loud, then let go.", onRelease: session.Released);
+    }
+
     private static void FlyTo(PointingTarget target) => s_pendingTargets.Enqueue(target);
 
     // MARK: - Interactive
 
-    private static int RunInteractive(Action onHold, string instructions, Action? onReady = null)
+    private static int RunInteractive(Action onHold, string instructions, Action? onReady = null, Action? onRelease = null)
     {
         nint window = CreateOverlayWindow();
         s_overlay = new CursorOverlay(window, SageGreen);
@@ -152,7 +215,11 @@ internal static class Program
         {
             Console.WriteLine("pressed");
             onHold();
-        }, static () => Console.WriteLine("released"));
+        }, () =>
+        {
+            Console.WriteLine("released");
+            onRelease?.Invoke();
+        });
         s_holdToTalk.Start();
         s_tip = OffsetFromMouse();
         Native.SetTimer(window, FrameTimerId, 16, 0);

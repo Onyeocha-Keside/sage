@@ -11,5 +11,6 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\Sage.Core\Sage.Core.csproj" />
+    <ProjectReference Include="..\..\src\Sage.Transcription\Sage.Transcription.csproj" />
   </ItemGroup>
 </Project>

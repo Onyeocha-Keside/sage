@@ -4,7 +4,8 @@ A native Windows client for Sage, in progress. It will use the same Cloudflare W
 
 ```
 src/Sage.Core/         Logic ported from the Mac app, with no Windows APIs. Builds and tests anywhere.
-src/Sage.Windows/      Prototype of the Windows-only parts. Only --ask uses the network.
+src/Sage.Transcription/ On-device speech-to-text with sherpa-onnx. Builds and tests anywhere.
+src/Sage.Windows/      Prototype of the Windows-only parts.
 tests/Sage.Core.Tests/ Unit tests, ported from leanring-buddyTests where the behavior is shared.
 ```
 
@@ -38,7 +39,7 @@ They cover monitor detection, mapping screenshot positions to the desktop, overl
 **2. By hand.**
 
 ```powershell
-.\SagePrototype.exe
+.\SagePrototype.exe --tour
 ```
 
 Check each of these:
@@ -62,6 +63,18 @@ Press Ctrl + C in the terminal to quit.
 `--setup` saves the Worker address to `%LOCALAPPDATA%\Sage\settings.json`. The token goes in Windows Credential Manager under `Sage/AccessToken`. `--ask` captures every monitor and sends the screenshots and your question to the Worker. The reply prints as it arrives and is spoken with a built-in Windows voice. The arrow flies to each thing Claude points at as that sentence starts. Hold **Ctrl + Win** to ask the same question again with a fresh screenshot. This interrupts any reply still playing.
 
 Until the updated Worker that accepts `platform` is deployed, replies may say "mac".
+
+**4. Talk to it.**
+
+```powershell
+.\SagePrototype.exe
+```
+
+The first run downloads the speech model, about 100 MB, from the sherpa-onnx GitHub releases. It's checked against a pinned SHA-256 and unpacked to `C:\ProgramData\Sage\models`. To download it ahead of time, run `--install-speech`. Then hold **Ctrl + Win**, ask your question out loud and let go. The audio is transcribed on the PC and never uploaded. Only the text and the screenshots go to the Worker. Holding the shortcut again stops the reply that's playing.
+
+If nothing is heard, check that Windows lets desktop apps use the microphone (Settings > Privacy & security > Microphone). In a VM, also check that the microphone is passed through.
+
+To test the speech model on any machine, set `SAGE_TEST_SPEECH_ARCHIVE` to the downloaded `.tar.bz2` and `SAGE_TEST_SPEECH_WAV` to a 16 kHz mono recording of "what is this button", then run `dotnet test`.
 
 ## What a VM can't prove
 

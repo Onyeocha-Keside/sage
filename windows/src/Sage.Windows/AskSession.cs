@@ -32,6 +32,16 @@ internal sealed class AskSession(SageWorkerClient client, ISpeechVoice voice, Ac
         _ = Task.Run(() => RunTurnAsync(question, turn.Token));
     }
 
+    /// <summary>Stops the reply in progress, for example because the user started talking.</summary>
+    public void Interrupt()
+    {
+        lock (_gate)
+        {
+            _current?.Cancel();
+            _queue.StopAll();
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate) _current?.Cancel();

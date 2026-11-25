@@ -10,8 +10,11 @@
     <AssemblyName>SagePrototype</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- sherpa-onnx's native libraries go inside the single-file exe and unpack on first run. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sage.Core\Sage.Core.csproj" />
+    <ProjectReference Include="..\Sage.Transcription\Sage.Transcription.csproj" />
   </ItemGroup>
 </Project>
