@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Sage.Core/Sage.Core.csproj" />
+    <Project Path="src/Sage.Transcription/Sage.Transcription.csproj" />
+    <Project Path="src/Sage.Windows/Sage.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Sage.Core.Tests/Sage.Core.Tests.csproj" />
+  </Folder>
+</Solution>
